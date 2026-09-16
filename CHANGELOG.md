@@ -1,5 +1,11 @@
 # Changelog
 
+- Add nine Ontario transit feeds: TTC, MiWay, Hamilton HSR, Durham Region,
+  YRT/Viva, Guelph, Burlington, Barrie and Kingston, each carrying its own
+  licence quote and attribution. A feed can now name its own modes, so Toronto's
+  trams read "Streetcar" while Helsinki's stay "Tram", and a feed whose route ids
+  are internal keys can translate them to the number a rider would say.
+
 - GBFS v3 station names use English translations when available, then the first
   usable translation or short name. Empty or malformed names no longer appear as
   `[object Object]` or interrupt station loading; legacy string names remain
