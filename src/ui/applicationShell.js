@@ -14,6 +14,7 @@ import { RecordingControls } from './recordingControls.js';
 import { readShellElements } from './shellElements.js';
 import { CockpitCoordinator } from './cockpitCoordinator.js';
 import { ContextControls } from './context.js';
+import { FlightRoster } from './flightRoster.js';
 import { CctvControls } from './cctv.js';
 import { StreetLevelControls } from './streetLevelControls.js';
 import { RadioControls } from './radio.js';
@@ -790,6 +791,11 @@ export class StyleManager extends ShellFacade {
 
   _initGlobalContextPanel() {
     const { radioLayer, militaryInstallationsLayer } = this.services;
+    this._flightRoster = new FlightRoster({
+      root: this._contextFlightsView,
+      layer: this.services.flightsLayer,
+      viewer: this.viewer,
+    });
     this._contextControls = new ContextControls({
       elements: {
         _globalContextPanel: document.getElementById('global-context-panel'),
@@ -1604,6 +1610,7 @@ export class StyleManager extends ShellFacade {
     // re-enable a mode's entry layer and republish `_contextMode` while the
     // rest of teardown is tearing those very layers down.
     this._contextControls.stop();
+    this._flightRoster?.destroy();
     this._navigation.destroy();
     // Close camera-entry seams synchronously. Context restoration may await
     // layer work, so leaving these listeners attached until afterward lets a

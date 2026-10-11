@@ -1313,6 +1313,139 @@
 .context-mode-view {
   min-height: 0;
 }
+.flight-roster {
+  margin: 0 0 10px;
+  padding: 10px;
+  border: 1px solid rgba(98, 181, 255, 0.2);
+  border-radius: 7px;
+  background: rgba(7, 19, 29, 0.48);
+  color: #d9f1ff;
+  font-family: var(--font-mono);
+}
+.flight-roster-heading,
+.flight-roster-selection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.flight-roster-heading > div {
+  display: grid;
+  gap: 4px;
+}
+.flight-roster-heading strong {
+  color: #a9ddff;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+.flight-roster-heading span,
+.flight-roster-selection,
+.flight-roster-note,
+.flight-roster-search-label {
+  color: rgba(190, 220, 235, 0.64);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+}
+.flight-roster-heading output {
+  color: #72e6ff;
+  font-size: 9px;
+}
+.flight-roster-search-label {
+  display: block;
+  margin: 10px 0 4px;
+}
+.flight-roster-search {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  border: 1px solid rgba(98, 181, 255, 0.28);
+  border-radius: 5px;
+  outline: none;
+  color: #e7f8ff;
+  background: rgba(0, 0, 0, 0.3);
+  font: 9px/1.2 var(--font-mono);
+}
+.flight-roster-search:focus {
+  border-color: #61dfff;
+  box-shadow: 0 0 0 1px rgba(97, 223, 255, 0.22);
+}
+.flight-roster-selection {
+  min-height: 30px;
+}
+.flight-roster-selection button,
+.flight-roster-row button {
+  min-height: 23px;
+  padding: 4px 7px;
+  border: 1px solid rgba(0, 212, 255, 0.35);
+  border-radius: 4px;
+  color: #9feaff;
+  background: rgba(0, 212, 255, 0.08);
+  font: 7px/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.flight-roster-selection button:disabled,
+.flight-roster-row button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.flight-roster-list {
+  display: grid;
+  gap: 3px;
+  max-height: 250px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.flight-roster-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 6px;
+  min-height: 38px;
+  padding: 4px 5px;
+  border: 1px solid rgba(98, 181, 255, 0.1);
+  border-radius: 4px;
+  background: rgba(16, 42, 59, 0.26);
+}
+.flight-roster-row:has(input:checked) {
+  border-color: rgba(0, 212, 255, 0.42);
+  background: rgba(0, 160, 210, 0.1);
+}
+.flight-roster-row input {
+  accent-color: #00d4ff;
+}
+.flight-roster-row > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.flight-roster-row strong,
+.flight-roster-row small {
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  line-height: 1.45;
+}
+.flight-roster-row strong {
+  color: #e5f6ff;
+  font-size: 8px;
+}
+.flight-roster-row small {
+  color: rgba(190, 220, 235, 0.6);
+  font-size: 7px;
+}
+.flight-roster-empty {
+  margin: 0;
+  padding: 12px 6px;
+  color: rgba(190, 220, 235, 0.58);
+  text-align: center;
+  font: 8px/1.4 var(--font-mono);
+}
+.flight-roster-note {
+  margin: 7px 0 0;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+}
 #right-context-rail #global-context-panel:not(.collapsed) .context-mode-view,
 #right-context-rail #global-context-panel:not(.collapsed) #radio-panel {
   /* These sections share the Context panel's existing scroller. Keep their

@@ -255,6 +255,20 @@ export function createQueries({
       operator: text(info?.airline),
       routeOrigin: routeOk ? text(info?.route?.origin?.code) : null,
       routeDestination: routeOk ? text(info?.route?.destination?.code) : null,
+      originName: routeOk ? text(info?.route?.origin?.name) : null,
+      destinationName: routeOk ? text(info?.route?.destination?.name) : null,
+      registration: text(info?.registration),
+      typeCode: text(info?.typeCode),
+      typeName: text(info?.typeName),
+      // The supported ADS-B snapshots report ground speed. They do not carry
+      // indicated or true airspeed, so consumers must display that as unknown.
+      groundSpeedMps: num(info?.velocity),
+      airSpeedMps: null,
+      source: text(flightState.feed._lastSource),
+      lastContactEpochMs: num(info?.lastContactEpochMs),
+      stale: Boolean(
+        flightState.records.missingPolls.get(icao24) || flightState.feed._backoff,
+      ),
     };
   }
   const methods = {
@@ -717,6 +731,82 @@ export function createQueries({
         if (result.length >= limit) break;
       }
       return result;
+    },
+
+    /**
+     * Recent feed-stamped fixes for selected aircraft, used to draw multiple
+     * live paths in the flight roster without changing the single camera
+     * tracking target. The history is deliberately bounded to the layer's
+     * short dead-reckoning window; long historical tracks remain a separate,
+     * on-demand source operation for a focused aircraft.
+     * @param {string[]} ids ICAO24 ids selected in the roster.
+     * @returns {Array<object>} JSON-safe current telemetry and recent fixes.
+     */
+    getRosterDetails(ids = []) {
+      if (!Array.isArray(ids) || !flightState.records.data.size) return [];
+      const result = [];
+      for (const value of ids) {
+        const icao24 = String(value ?? '').trim().toLowerCase();
+        const info = flightState.records.data.get(icao24);
+        if (!info) continue;
+        const routeOk = !!info.route &&
+          parts.tracking._routeIsPlausible(icao24, info.route);
+        const record = mapAnalystRecord(icao24, info, {
+          military: isMilitaryIcao(icao24),
+          routeOk,
+        });
+        const fixes = (flightState._positionHistory.get(icao24) || []).map(
+          (fix) => {
+            const carto = Cesium.Cartographic.fromCartesian(fix.position);
+            return carto
+              ? {
+                  lat: Cesium.Math.toDegrees(carto.latitude),
+                  lon: Cesium.Math.toDegrees(carto.longitude),
+                  altitudeM: carto.height,
+                  epochMs: fix.epochMs,
+                }
+              : null;
+          },
+        ).filter(Boolean);
+        result.push({ ...record, fixes });
+      }
+      return result;
+    },
+
+    /** Fetch one selected aircraft's provider track for the multi-flight roster. */
+    async getHistoricalTrack(id, { signal } = {}) {
+      const icao24 = String(id ?? '').trim().toLowerCase();
+      const info = flightState.records.data.get(icao24);
+      if (!info || typeof flightState.feed._source.getTrack !== 'function')
+        return [];
+      const track = await flightState.feed._source.getTrack(
+        info.sourceReference ?? icao24,
+        {
+          signal: signal || AbortSignal.any([
+            flightState.lifetime.signal,
+            AbortSignal.timeout(8000),
+          ]),
+        },
+      );
+      return (track?.records || []).flatMap((fix) => {
+        if (!Number.isFinite(fix.latitude) || !Number.isFinite(fix.longitude))
+          return [];
+        return [{
+          lat: fix.latitude,
+          lon: fix.longitude,
+          altitudeM: fix.baroAltitudeM,
+          epochMs: fix.observedAtMs,
+        }];
+      });
+    },
+
+    /** Queue bounded metadata lookups for an explicitly selected roster flight. */
+    enrichRosterFlight(id) {
+      const icao24 = String(id ?? '').trim().toLowerCase();
+      if (!flightState.records.data.has(icao24)) return false;
+      parts.enrichment._requestTypeEnrichment(icao24, true);
+      parts.enrichment._requestRouteEnrichment(icao24);
+      return true;
     },
 
     /**
