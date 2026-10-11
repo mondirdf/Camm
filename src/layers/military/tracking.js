@@ -7,6 +7,7 @@ import {
   stabilizeScreenRotation,
 } from '../../data/iconOrientation.js';
 import { trailHeadStart } from '../../data/modelVisualAnchor.js';
+import { createSelectionHighlights } from '../../data/trackedHighlights.js';
 import { CLASS_SCALE_2D } from '../../data/aircraftClass.js';
 import {
   bindTrackingClickGesture,
@@ -48,6 +49,10 @@ export function createTracking({
   const { clearFocusTarget } = services.focus;
   const { applyTrackedCameraFrame } = services.camera;
   const { resolvePickId, isOwnedByOtherLayer } = services.picking;
+
+  // Multi-track highlights: aircraft that were tracked stay visibly marked after
+  // the follow-camera moves to a newer selection.
+  const trackHighlights = createSelectionHighlights(flightState, 'military');
 
   function _emitAwarenessEvent(type, detail) {
     if (
@@ -753,14 +758,18 @@ export function createTracking({
    *   rather than being deselected. Consumers that keep a readout on screen
    *   (the Cockpit Contact panel) hold last-known values for an eviction and
    *   only tear down on a deliberate clear.
+   * @param {boolean} [options.keepHighlights=false] - Keep the multi-track
+   *   selection rings (a plane-to-plane follow switch, or another layer taking
+   *   the camera), so previously-tracked aircraft stay visible.
    */
 
   function _clearTracking(
     skipViewerUntrack = false,
-    { evicted = false, origin = 'programmatic' } = {},
+    { evicted = false, origin = 'programmatic', keepHighlights = false } = {},
   ) {
     flightState._trackedCameraFrameStop?.();
     flightState._trackedCameraFrameStop = null;
+    if (!keepHighlights) trackHighlights.clear();
     if (!flightState._trackedIcao) {
       clearFocusTarget('militaryFlights');
       return;
@@ -852,7 +861,16 @@ export function createTracking({
    */
 
   function _trackFlight(icao24, { origin = 'programmatic' } = {}) {
-    _clearTracking(false, { origin }); // switching planes — the new follow-camera takes over
+    // Multi-track: keep the OUTGOING aircraft visibly marked after the
+    // follow-camera moves on, and drop any ring the incoming one still carries
+    // (it becomes the cyan followed target now).
+    if (flightState._trackedIcao && flightState._trackedIcao !== icao24)
+      trackHighlights.add(flightState._trackedIcao);
+    trackHighlights.remove(icao24);
+    _clearTracking(false, {
+      origin,
+      keepHighlights: true, // switching planes — the new follow-camera takes over
+    });
 
     const bb = flightState._billboards.get(icao24);
     const info = flightState.records.data.get(icao24);
@@ -1056,6 +1074,7 @@ export function createTracking({
               origin:
                 flightState._viewer.trackedEntity?.gevSelectionOrigin ||
                 'programmatic',
+              keepHighlights: true,
             });
           }
         });
@@ -1165,6 +1184,9 @@ export function createTracking({
     _clearTrail,
     _destroyTrail,
     _clearTracking,
+    _addTrackHighlight: trackHighlights.add,
+    _removeTrackHighlight: trackHighlights.remove,
+    _clearTrackHighlights: trackHighlights.clear,
     _applyPendingTrackingRestore,
     _cancelPendingTrackingRestore,
     _trackFlight,
