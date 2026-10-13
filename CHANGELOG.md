@@ -95,6 +95,10 @@
 
 ## [Unreleased]
 
+- Bound the remaining upstream body reads (FIRMS, CelesTrak, adsb.lol,
+  TomTom, OpenSky, adsbdb) with streaming size caps and shared deadlines; the
+  adsb.lol military poll gains a deadline of its own.
+
 - Keep later satellites when a TLE catalog entry is missing an orbital line.
   The parser skips the incomplete set and resumes at the next complete named
   set, instead of losing the rest of the group (#906).
