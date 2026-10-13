@@ -9,6 +9,16 @@ import { acquireImageryComparison } from './imageryComparison.js';
  */
 const AUTOMATIC = Symbol('automatic switch');
 
+/** Background retries of a fallback in use back off from 30 s to 10 min. */
+const FALLBACK_RETRY_MS = 30_000;
+const FALLBACK_RETRY_MAX_MS = 600_000;
+
+const resolved = (provider, effectiveStackId) => ({
+  provider,
+  effectiveStackId,
+  fallbackMessage: null,
+});
+
 /** Coordinate source lifetimes and scene changes; the registry owns provider choices. */
 export class MapSourceController {
   constructor(
@@ -46,8 +56,12 @@ export class MapSourceController {
     this._lastError = null;
     this._imageryLayer = null;
     this._activeImageryProvider = null;
+    this._activeResolution = null;
     this._removeImageryErrorListener = null;
     this._terrainMode = null;
+    this._terrainFallback = null;
+    this._retryTimer = null;
+    this._retryDelay = FALLBACK_RETRY_MS;
     this._subscribers = new Set();
     this._destroyed = false;
   }
@@ -282,19 +296,100 @@ export class MapSourceController {
     this._showTileset(null);
     this.viewer.scene.globe.show = true;
     this._activeId = resolution.effectiveStackId;
+    this._activeResolution = resolution;
     if (source?.terrain && source.terrain.id !== this._terrainMode) {
       const terrain = source.terrain;
-      const result = await this._cached(
-        this._terrainProviders,
-        terrain.id,
-        () => terrain.create({ signal: this._abort.signal }),
+      const pending = this._cached(this._terrainProviders, terrain.id, () =>
+        terrain.create({ signal: this._abort.signal }),
       );
+      let result = await pending;
       if (gen !== this._switchGen) return;
-      if (result.terrain) this.viewer.scene.setTerrain(result.terrain);
-      else this.viewer.terrainProvider = result.provider;
+      // A background retry may have replaced a fallback while this waited.
+      const latest = this._terrainProviders.get(terrain.id);
+      if (latest !== pending) result = await latest;
+      if (gen !== this._switchGen) return;
+      this._applyTerrain(result);
       this._terrainMode = terrain.id;
     }
+    if (resolution.fallbackFor || this._terrainFallback) this._scheduleRetry();
     return resolution;
+  }
+
+  _applyTerrain(result) {
+    if (result.terrain) this.viewer.scene.setTerrain(result.terrain);
+    else this.viewer.terrainProvider = result.provider;
+    this._terrainFallback = result.fallback ? result : null;
+  }
+
+  /**
+   * One timer retries the real provider behind whichever fallback is on
+   * screen: Esri's OSM stand-in, or flat terrain on a shown globe. Fallbacks
+   * stay cached and shown meanwhile, so no switch waits on a retry; a
+   * fallback out of use is left alone until an activation shows it again.
+   */
+  _scheduleRetry() {
+    if (this._retryTimer) return;
+    this._retryTimer = setTimeout(() => {
+      this._retryTimer = null;
+      void this._retryFallbacks();
+    }, this._retryDelay);
+  }
+
+  async _retryFallbacks() {
+    const resolution = this._activeResolution;
+    const flat = this.viewer.scene.globe.show ? this._terrainFallback : null;
+    const id = resolution?.fallbackFor;
+    let terrain = flat && this._sources.get(this._activeId)?.terrain;
+    if (terrain?.id !== this._terrainMode) terrain = null;
+    if (!id && !terrain) return;
+    const attempt = async (create) => {
+      try {
+        return await create?.({ signal: this._abort.signal });
+      } catch {
+        return null; // Still unavailable: keep the fallback.
+      }
+    };
+    const [provider, real] = await Promise.all([
+      id && attempt(this._sources.get(id).imagery),
+      terrain && attempt(terrain.create),
+    ]);
+    if (this._destroyed) {
+      this._dispose(provider);
+      this._dispose(real?.provider);
+      return;
+    }
+    let failed = (id && !provider) || (terrain && (!real || real.fallback));
+    try {
+      if (provider) {
+        this._imageryProviders.set(id, Promise.resolve(resolved(provider, id)));
+        // Still showing the fallback once any switch settles: use the real one.
+        const recover = () => {
+          if (this._activeResolution === resolution)
+            void this.setStack(id, { [AUTOMATIC]: true });
+        };
+        if (!this._isSwitching) recover();
+        else {
+          const stop = this.subscribe(() => {
+            stop();
+            recover();
+          });
+        }
+      }
+      if (terrain && real && !real.fallback) {
+        this._terrainProviders.set(terrain.id, Promise.resolve(real));
+        if (this._terrainFallback === flat && this.viewer.scene.globe.show) {
+          this._applyTerrain(real);
+          this._requestRender('map-stack');
+        } else this._terrainMode = null; // The next globe activation installs it.
+      }
+    } catch (error) {
+      console.warn('[MapSourceController] fallback recovery failed:', error);
+      failed = true;
+    }
+    this._retryDelay = failed
+      ? Math.min(this._retryDelay * 2, FALLBACK_RETRY_MAX_MS)
+      : FALLBACK_RETRY_MS;
+    if (failed) this._scheduleRetry();
   }
 
   _cached(cache, id, create) {
@@ -320,7 +415,7 @@ export class MapSourceController {
       try {
         const provider = await source.imagery({ signal: this._abort.signal });
         if (this._destroyed) this._dispose(provider);
-        return { provider, effectiveStackId: stack.id, fallbackMessage: null };
+        return resolved(provider, stack.id);
       } catch (error) {
         const fallback = source.constructionFallback;
         if (this._destroyed || !fallback || !this.isStackAvailable(fallback.id))
@@ -330,7 +425,11 @@ export class MapSourceController {
           this.getStack(fallback.id),
           next,
         );
-        return { ...resolution, fallbackMessage: fallback.message };
+        return {
+          ...resolution,
+          fallbackMessage: fallback.message,
+          fallbackFor: stack.id,
+        };
       }
     });
   }
@@ -385,6 +484,7 @@ export class MapSourceController {
       this.viewer.imageryLayers.remove(this._imageryLayer, true);
     this._imageryLayer = null;
     this._activeImageryProvider = null;
+    this._activeResolution = null;
   }
   _dispose(value) {
     if (!value || this._disposed.has(value)) return;
@@ -398,6 +498,7 @@ export class MapSourceController {
     this._subscribers.clear();
     this._switchGen++;
     this._abort.abort();
+    clearTimeout(this._retryTimer);
     this._isSwitching = false;
     this._removeImageryLayer();
     this._credits.destroy();
