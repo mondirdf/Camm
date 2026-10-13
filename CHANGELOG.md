@@ -1,5 +1,9 @@
 # Changelog
 
+- Location search accepts two-dimensional WGS84 `geo:` URIs offline, with
+  the existing coordinate framing and label. Unsupported URI fields are passed
+  to the remaining search providers unchanged.
+
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
 

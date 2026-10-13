@@ -4197,12 +4197,17 @@ and unreachable upstream (502/504) separately from road geometry.
 
 Location search/fly-to, annotations and Radio location lookup receive one
 `placeSearch.geocode(query, { bias, signal })` service. `src/standalone` composes
-two offline providers first — a strict decimal-degree coordinate reader and an
+two offline providers first — a strict decimal-degree/geo-URI coordinate reader and an
 exact-match reader over the bundled city and landmark names — then Google when
 configured and Photon/OpenStreetMap as fallback, including Google transport
 failures or declined requests. The offline pair answer with no request and no
 key, and decline everything they are not certain of: a coordinate must be a
-decimal-degree pair (either order when N/S/E/W fix the axes), and a bundled name
+decimal-degree pair (either order when N/S/E/W fix the axes), or a two-dimensional
+WGS84 `geo:latitude,longitude` URI with an optional `;crs=wgs84`. URI scheme and
+CRS names are case-insensitive; internal whitespace, altitude, uncertainty, other
+parameters, query strings and fragments decline rather than silently dropping
+information. For example, `geo:39.7392,-104.9903` resolves offline to the same exact
+point, decimal label and framing box as `39.7392, -104.9903`. A bundled name
 must match exactly, so `12junk, 34oops` and `austin, tx` both reach the
 geocoders instead of being answered from the bundle. Degrees/minutes/seconds and
 grid references are not parsed. An answer either provider gives is exact, so
