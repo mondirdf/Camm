@@ -1,5 +1,12 @@
 # Changelog
 
+- Add one keyless RTD VehiclePositions feed for Denver / Boulder, with a 70 km
+  activation radius, exact static-GTFS bus/light-rail/rail classification and
+  text-only operator/license credit. The shared decoder preserves nonblank route
+  IDs exactly; blank IDs remain null. Unknown, padded and unassigned RTD routes
+  remain unclassified. Reuses existing transit polling, freshness and security
+  policies; no arrivals, alerts or proxy history retention are added.
+
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
 

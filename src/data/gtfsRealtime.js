@@ -225,7 +225,10 @@ export function normalizeVehicleEntity(entity) {
     bearing: bearing === null ? null : ((bearing % 360) + 360) % 360,
     speedMps: speed === null || speed < 0 ? null : speed,
     timestamp,
-    routeId: nonEmptyString(vehicle.trip?.routeId),
+    // Route lookup keys must retain their exact nonblank wire identity.
+    routeId: nonEmptyString(vehicle.trip?.routeId)
+      ? vehicle.trip.routeId
+      : null,
     tripId: nonEmptyString(vehicle.trip?.tripId),
     directionId: Number.isInteger(vehicle.trip?.directionId)
       ? vehicle.trip.directionId
