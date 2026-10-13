@@ -1,5 +1,13 @@
 # Changelog
 
+- Ship a web app manifest and raster home-screen icons, so adding the app to a
+  phone home screen or installing it on desktop uses the God's Eye View mark
+  instead of a blank tile. The icons are generated from `public/logo.svg` by
+  `node scripts/generate-icons.mjs` and committed, so a plain `vite build` needs
+  no image toolchain. The existing SVG favicon still serves the browser tab.
+  Manifest paths are relative to the manifest, so a build served under a path
+  prefix installs and launches inside that prefix.
+
 - GBFS v3 station names use English translations when available, then the first
   usable translation or short name. Empty or malformed names no longer appear as
   `[object Object]` or interrupt station loading; legacy string names remain
