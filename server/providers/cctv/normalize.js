@@ -553,3 +553,14 @@ export function normalizeSourceItem(item) {
     poseSource: item.poseSource === 'curated' ? 'curated' : undefined,
   };
 }
+
+/** City of Toronto bounding box (Steeles to the lake, Etobicoke to Scarborough). */
+export function isLikelyTorontoCoordinate(lat, lon) {
+  return (
+    isPlausibleLatLon(lat, lon) &&
+    lat >= 43.55 &&
+    lat <= 43.9 &&
+    lon >= -79.7 &&
+    lon <= -79.1
+  );
+}
