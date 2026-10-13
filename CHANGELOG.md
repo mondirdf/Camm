@@ -1,5 +1,9 @@
 # Changelog
 
+- Military aircraft keep their last heading and speed when an adsb.lol row omits
+  `track` or `gs`, instead of turning north and stopping; a grounded row without
+  a speed still reads 0.
+
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
 
