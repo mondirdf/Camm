@@ -1,5 +1,8 @@
 # Changelog
 
+- Add Bogotá (Tembici) and Santiago (Bike Itaú) to the GBFS bikeshare registry,
+  the layer's first stations in Colombia and Chile.
+
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
 

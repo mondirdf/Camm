@@ -249,7 +249,7 @@ export const DATA_CREDITS = [
   },
   {
     key: 'gbfs',
-    html: 'Bikeshare availability: GBFS operator feeds (e.g. Austin BCycle)',
+    html: 'Bikeshare availability: GBFS operator feeds (e.g. Austin BCycle, Tembici / Bike Itaú)',
   },
   {
     key: 'osrm-routing',
