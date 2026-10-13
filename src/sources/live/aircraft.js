@@ -6,10 +6,12 @@ import {
   finite,
 } from './contract.js';
 
+const openSkyId = (row) =>
+  Array.isArray(row) ? cleanText(row[0]).toLowerCase() : '';
+
 /** Normalize the OpenSky state-vector route, including its regional fallback. */
 export function normalizeOpenSkyAircraft(row) {
-  if (!Array.isArray(row)) return null;
-  const id = cleanText(row[0]).toLowerCase();
+  const id = openSkyId(row);
   if (!id || !coordinates(row[6], row[5])) return null;
   return {
     id,
@@ -71,6 +73,16 @@ export function normalizeReadsbAircraft(row, snapshotTimeMs) {
   };
 }
 
+/**
+ * OpenSky allows null longitude/latitude for a contact that is still
+ * broadcasting. Strict nulls also reject rows truncated before the position.
+ */
+function openSkyUnpositionedId(row) {
+  return Array.isArray(row) && row[5] === null && row[6] === null
+    ? openSkyId(row)
+    : '';
+}
+
 export function openSkySnapshot(
   payload,
   {
@@ -84,6 +96,7 @@ export function openSkySnapshot(
     payload?.states,
     normalizeOpenSkyAircraft,
     'OpenSky',
+    openSkyUnpositionedId,
   );
   const observedAtMs = epoch(payload?.time, 1000);
   const ageMs = observedAtMs == null ? null : Math.max(0, now - observedAtMs);

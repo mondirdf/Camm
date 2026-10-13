@@ -1,5 +1,10 @@
 # Changelog
 
+- Flights age out vanished aircraft again. OpenSky's routine position-less rows
+  no longer mark every snapshot partial, which had kept vanished and landed
+  aircraft at full opacity for up to five minutes; those rows retain only their
+  own aircraft, and a likely-landed one still leaves on the landed limit.
+
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
 
