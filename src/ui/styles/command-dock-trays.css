@@ -492,33 +492,6 @@ body:not(.ui-clean-view):not(.recording-mode):has(
   }
 }
 
-@media (max-width: 420px) {
-  #command-dock .gev-voice-error-tray {
-    position: fixed;
-    right: auto;
-    bottom: calc(2vh + 5rem + var(--dock-pinned-stack-height));
-    left: 50%;
-    box-sizing: border-box;
-    width: min(24rem, calc(100vw - 1.5rem));
-    transform: translate(-50%, 0.55rem) scale(0.985);
-  }
-
-  #command-dock
-    #gev-voice-control[data-status='error']:not(.error-dismissed)
-    .gev-voice-error-tray {
-    transform: translate(-50%, 0) scale(1);
-  }
-
-  #command-dock .gev-voice-panel .gev-voice-error-tray {
-    position: static;
-    right: auto;
-    bottom: auto;
-    left: auto;
-    width: 100%;
-    transform: none;
-  }
-}
-
 @media (max-width: 620px) {
   #command-dock {
     --dock-side-compact: 3.25rem;

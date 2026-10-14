@@ -1,4 +1,3 @@
-import { createGeminiLiveConfig } from '../../server/providers/gemini/config.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -38,29 +37,7 @@ test('the complete Realtime tool payload pins the manifest-generated layer relea
     // omit top-level anyOf (OpenAI rejects it). Contacts list routing preserves
     // requested radius and center authority in descriptions only.
     // Street Level adds its toggle enum values and generated alias hint.
-    // Provider Settings remains model-visible. Clear provider-switch requests
-    // receive model-spoken dropdown guidance and are absent from tools; only
-    // the manual dropdown may change the provider.
-    'c3191a9a118813c927bcbc565dc4de0df11c1f9503f3314a9bc6e440b2089828',
-  );
-});
-
-test('provider switching is absent from both model tool catalogs', () => {
-  assert.equal(
-    GEV_ACTION_SCHEMAS.some((tool) => tool.name === 'set_voice_provider'),
-    false,
-  );
-  assert.equal(
-    GEV_REALTIME_TOOLS.some((tool) => tool.name === 'set_voice_provider'),
-    false,
-  );
-  assert.equal(
-    createGeminiLiveConfig().tools?.some((group) =>
-      group.functionDeclarations?.some(
-        (tool) => tool.name === 'set_voice_provider',
-      ),
-    ),
-    false,
+    '9eb113454c5af5e32e27ffcdc7919d0e4600ba1d204f8f175e071152be41ad0f',
   );
 });
 
@@ -118,16 +95,7 @@ test('metadata cannot add tools, fields, types or enum values', () => {
 
 test('all legacy action arguments are byte-identical after removing the deliberate additions', () => {
   const legacy = structuredClone(GEV_ACTION_SCHEMAS).filter(
-    (tool) =>
-      ![
-        'next_satellite_pass',
-        'set_cyber_sonar',
-        'set_voice_provider',
-        'set_voice_inactivity_timeout',
-        'set_voice_panel_order',
-        'set_voice_preview_enabled',
-        'set_street_level_options',
-      ].includes(tool.name),
+    (tool) => !['next_satellite_pass', 'set_cyber_sonar'].includes(tool.name),
   );
   // Layer enums are generated from the voice layer manifest and pinned by
   // layerManifest.test.mjs; the two shipped right-rail panels are additive.
@@ -137,22 +105,9 @@ test('all legacy action arguments are byte-identical after removing the delibera
   delete property('show_data_layers_menu').layerId.enum;
   delete property('get_entity_context').layerId.enum;
   delete property('analyst_query').layers.items.enum;
-  // Earth-centered rotation is additive; local camera yaw keeps its contract.
-  property('move_camera').motion.enum = property(
-    'move_camera',
-  ).motion.enum.filter((motion) => motion !== 'rotate_globe');
   const panels = property('set_panel_open').panelId;
   panels.enum = panels.enum.filter(
-    (id) =>
-      ![
-        'weather-panel',
-        'recent-imagery-panel',
-        'provider-settings',
-        'street-level-panel',
-        'voice-settings',
-        'voice-preview',
-        'settings',
-      ].includes(id),
+    (id) => !['weather-panel', 'recent-imagery-panel'].includes(id),
   );
   for (const tool of legacy) {
     // Point-and-ask adds `referent` arguments and 'pointer' enum values.
@@ -187,24 +142,6 @@ test('all legacy action arguments are byte-identical after removing the delibera
     createHash('sha256').update(JSON.stringify(legacy)).digest('hex'),
     '01f14fdb1523eebfcbff8b115e48e6ab99e36fa06f55a3bb13c65e198f79d758',
   );
-});
-
-test('globe rotation is an additive camera motion with the existing control arguments', () => {
-  const schema = GEV_ACTION_SCHEMAS.find(
-    (tool) => tool.name === 'move_camera',
-  ).parameters;
-  for (const motion of ['rotate_globe', 'rotate', 'orbit', 'pan', 'tilt']) {
-    assert.deepEqual(
-      validateArgs(schema, {
-        motion,
-        direction: 'right',
-        speed: 'slow',
-        mode: 'continuous',
-      }),
-      [],
-    );
-  }
-  assert.ok(validateArgs(schema, { motion: 'spin_camera' }).length > 0);
 });
 
 test('track_entity accepts a referent alone but rejects an empty target', () => {
@@ -246,55 +183,32 @@ test('the benchmark still rejects an empty track_entity although the model-facin
   );
 });
 
-test('both voice providers advertise exactly the same core action arguments', () => {
-  const declarations = createGeminiLiveConfig().tools[0].functionDeclarations;
-  assert.deepEqual(
-    declarations.map(({ name, description, parametersJsonSchema }) => ({
-      name,
-      description,
-      parameters: parametersJsonSchema,
-    })),
-    GEV_REALTIME_TOOLS.map(({ name, description, parameters }) => ({
-      name,
-      description,
-      parameters,
-    })),
+import { createGeminiLiveConfig } from '../../server/providers/gemini/config.js';
+test('Gemini uses the shared core catalog without follow-up actions', () => {
+  const setup = createGeminiLiveConfig();
+  const declarations = setup.tools.flatMap(
+    (tool) => tool.functionDeclarations || [],
   );
-  assert.ok(declarations.every(({ behavior }) => behavior === 'BLOCKING'));
+  assert.deepEqual(
+    declarations.map((tool) => tool.name),
+    GEV_REALTIME_TOOLS.map((tool) => tool.name),
+  );
+  for (const name of [
+    'set_voice_provider',
+    'set_voice_inactivity_timeout',
+    'set_voice_panel_order',
+    'set_voice_preview_enabled',
+    'set_street_level_options',
+  ]) {
+    assert.equal(
+      declarations.some((tool) => tool.name === name),
+      false,
+      name,
+    );
+  }
+  const camera = GEV_ACTION_SCHEMAS.find((tool) => tool.name === 'move_camera');
   assert.equal(
-    declarations.some(({ name }) => name === 'set_voice_provider'),
+    camera.parameters.properties.motion.enum.includes('rotate_globe'),
     false,
   );
-  assert.ok(
-    declarations.some(({ name }) => name === 'set_voice_preview_enabled'),
-  );
-  assert.ok(
-    declarations.some(({ name }) => name === 'set_voice_inactivity_timeout'),
-  );
-});
-
-test('both providers expose absolute preview and bounded Street View options', () => {
-  const preview = GEV_REALTIME_TOOLS.find(
-    (tool) => tool.name === 'set_voice_preview_enabled',
-  );
-  assert.deepEqual(preview.parameters, {
-    type: 'object',
-    additionalProperties: false,
-    properties: { enabled: { type: 'boolean' } },
-    required: ['enabled'],
-  });
-  const street = GEV_REALTIME_TOOLS.find(
-    (tool) => tool.name === 'set_street_level_options',
-  );
-  assert.deepEqual(street.parameters.properties.provider.enum, [
-    'mapillary',
-    'google',
-  ]);
-  assert.equal(street.parameters.properties.sinceDays.maximum, 36500);
-  const declarations = createGeminiLiveConfig().tools[0].functionDeclarations;
-  for (const action of [preview, street]) {
-    const gemini = declarations.find((tool) => tool.name === action.name);
-    assert.deepEqual(gemini.parametersJsonSchema, action.parameters);
-    assert.equal(gemini.description, action.description);
-  }
 });

@@ -1,4 +1,3 @@
-import { registerKeySetupForDocument } from './keySetupRegistry.js';
 import { createSurfaceKeyboard } from './ui/surfaceKeyboard.js';
 import {
   readStoredCloudVoiceAuthMode,
@@ -260,9 +259,6 @@ export async function initKeySetup({
   root.dataset.initialized = 'true';
   const lifetime = new AbortController();
   let disposed = false;
-  let publicApi = null;
-  let unregisterSetup = () => {};
-  const host = documentRef?.defaultView || globalThis.window || globalThis;
   let disposeControls = () => {};
   let disposePlacement = () => {};
   const destroy = () => {
@@ -272,8 +268,6 @@ export async function initKeySetup({
     signal?.removeEventListener('abort', destroy);
     disposeControls();
     disposePlacement();
-    unregisterSetup();
-    if (host.__gevKeySetup === publicApi) delete host.__gevKeySetup;
     chip.remove();
     root.remove();
   };
@@ -595,8 +589,5 @@ export async function initKeySetup({
     closeButton?.removeEventListener('click', close);
     applyButton?.removeEventListener('click', onApply);
   };
-  publicApi = { open: openDialog, close, render, destroy };
-  unregisterSetup = registerKeySetupForDocument(documentRef, publicApi);
-  host.__gevKeySetup = publicApi;
-  return publicApi;
+  return { open: openDialog, close, render, destroy };
 }

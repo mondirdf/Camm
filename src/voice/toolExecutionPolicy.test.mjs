@@ -174,15 +174,15 @@ test('a blocked provider request overrides action-specific follow-up wording', (
   const guidance =
     'I can’t switch voice providers directly. Hover over the Voice panel and use the provider dropdown.';
   for (const action of [
-    'set_voice_preview_enabled',
-    'set_voice_panel_order',
+    'set_hud',
+    'control_radio',
     'set_panel_open',
     'get_weather',
   ]) {
     const instruction = toolResultGuidance({
       ok: false,
       action,
-      panelId: 'voice-settings',
+      panelId: 'radio-panel',
       providerRequestBlocked: true,
       say: guidance,
     });

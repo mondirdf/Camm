@@ -298,11 +298,11 @@ async function main() {
     );
     console.log('PASS: header drag lifts CCTV out of the rail');
 
-    // Park high enough that the voice provider row cannot cover the southwest
-    // handle after the loop below has grown the window.
+    // Park near the top: the voice dock would cover the south corners once
+    // the loop below has grown the window.
     {
       const header = await headerPoint();
-      await drag(header, 0, 40 - header.y);
+      await drag(header, 0, 120 - header.y);
     }
 
     const limits = {

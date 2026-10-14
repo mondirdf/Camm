@@ -3,7 +3,7 @@
  * An adapter receives { emit, runAction, signal } and supplies start, stop,
  * sendText and sendMapEvent. It owns its microphone/connection and wire messages.
  * Events: state, stop, transcript, action-call, progress, action-result,
- * action-settled, interruption, completion, turn-metrics. A stop event also
+ * interruption, completion, turn-metrics. A stop event also
  * covers teardown that preserves the adapter’s displayed status.
  */
 export function createVoiceSession({ createAdapter, runner, signal }) {
@@ -17,7 +17,6 @@ export function createVoiceSession({ createAdapter, runner, signal }) {
   let disposed = false;
   let generation = 0;
   let startAttempt = 0;
-  let actionSequence = 0;
 
   function cancelActions() {
     generation++;
@@ -53,7 +52,6 @@ export function createVoiceSession({ createAdapter, runner, signal }) {
     )
       throw abortError();
     const action = new AbortController();
-    const actionId = ++actionSequence;
     const epoch = generation;
     actions.add(action);
     const actionSignal = AbortSignal.any([
@@ -70,7 +68,7 @@ export function createVoiceSession({ createAdapter, runner, signal }) {
       if (!isCurrent()) throw abortError();
       // Calls carry the adapter's call id so observers can match progress
       // and results to the right call when a tool runs twice at once.
-      emit({ type: 'action-call', actionId, name, callId, arguments: args });
+      emit({ type: 'action-call', name, callId, arguments: args });
       if (!isCurrent()) throw abortError();
       // Step reports reach observers only while the action is current, so a
       // cancelled tool cannot update the plan or start narration.
@@ -92,13 +90,12 @@ export function createVoiceSession({ createAdapter, runner, signal }) {
         progress,
       });
       if (!isCurrent()) throw abortError();
-      emit({ type: 'action-result', actionId, name, callId, result });
+      emit({ type: 'action-result', name, callId, result });
       return result;
     } catch (error) {
       if (isCurrent())
         emit({
           type: 'action-result',
-          actionId,
           name,
           callId,
           result: { ok: false, error: error?.message || String(error) },
@@ -106,7 +103,6 @@ export function createVoiceSession({ createAdapter, runner, signal }) {
       throw error;
     } finally {
       actions.delete(action);
-      emit({ type: 'action-settled', actionId, name, callId });
     }
   }
 
@@ -180,7 +176,7 @@ export function createVoiceSession({ createAdapter, runner, signal }) {
           emit({
             type: 'state',
             state: 'idle',
-            detail: options.detail || 'Voice off',
+            detail: 'Voice off',
           });
       }
     },

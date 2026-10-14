@@ -56,20 +56,6 @@ export function readVoiceProviderRequestText(input) {
   return requested.replace(/\s+/g, '');
 }
 
-/** Code-authored guidance contract; voice never changes the selected provider. */
-export function providerManualConfirmationSay() {
-  return VOICE_PROVIDER_GUIDANCE;
-}
-
-/** Retained for compatibility with older callers; all routes give one answer. */
-export function providerSwitchSay() {
-  return providerManualConfirmationSay();
-}
-
-export function providerUnavailableSay() {
-  return providerManualConfirmationSay();
-}
-
 /** Return the non-mutating result shared by every model tool surface. */
 export function providerRequestGuidanceResult(action) {
   return {

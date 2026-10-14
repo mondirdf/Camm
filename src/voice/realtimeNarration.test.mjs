@@ -588,303 +588,23 @@ test('OpenAI clears stale speech before a typed provider request reaches the mod
   );
 });
 
-test('OpenAI emits first-party final input and locally retires competing model output', async () => {
-  const observed = [];
-  const f = controllerFixture({
-    onSessionEvent: (event) => observed.push(event),
-  });
-  await f.event({
-    type: 'input_audio_buffer.speech_started',
-    item_id: 'speech',
-  });
-  await f.event({
-    type: 'conversation.item.input_audio_transcription.completed',
-    item_id: 'speech',
-    transcript: 'Switch to Gemini',
-  });
-  assert.deepEqual(
-    observed.findLast((event) => event.type === 'user-input-final'),
-    {
-      type: 'user-input-final',
-      inputKind: 'speech',
-      inputId: 'speech',
-      inputScope: 'utterance',
-      text: 'Switch to Gemini',
-    },
-  );
-  const finalCount = observed.filter(
-    (event) => event.type === 'user-input-final',
-  ).length;
-  await f.event({
-    type: 'conversation.item.input_audio_transcription.completed',
-    item_id: 'stale-speech',
-    transcript: 'Switch to OpenAI',
-  });
-  await f.event({
-    type: 'conversation.item.input_audio_transcription.completed',
-    item_id: 'speech',
-    transcript: 'Switch to OpenAI',
-  });
-  assert.equal(
-    observed.filter((event) => event.type === 'user-input-final').length,
-    finalCount,
-  );
-  await f.event({ type: 'response.created', response: { id: 'r1' } });
-  await f.event({ type: 'output_audio_buffer.started', response_id: 'r1' });
-  assert.equal(f.controller.claimLocalProviderCommand(), true);
-  assert.deepEqual(types(f.sent).slice(-2), [
-    'response.cancel',
-    'output_audio_buffer.clear',
-  ]);
-  await f.event({ type: 'output_audio_buffer.cleared', response_id: 'r1' });
-  assert.equal(
-    observed.findLast((event) => event.type === 'audio-cleared').reason,
-    'local-provider-guidance',
-  );
-});
 
-test('OpenAI preserves FIFO local clear provenance across release and reclaim', async () => {
-  const observed = [];
-  const f = controllerFixture({
-    onSessionEvent: (event) => observed.push(event),
-  });
-  await f.event({ type: 'response.created', response: { id: 'old' } });
-  await f.event({ type: 'output_audio_buffer.started', response_id: 'old' });
-  assert.equal(f.controller.claimLocalProviderCommand(), true);
-  f.controller.releaseLocalProviderCommand();
-  await f.event({ type: 'response.created', response: { id: 'new' } });
-  await f.event({ type: 'output_audio_buffer.started', response_id: 'new' });
-  assert.equal(f.controller.claimLocalProviderCommand(), true);
-  await f.event({
-    type: 'output_audio_buffer.cleared',
-    response_id: 'old',
-  });
-  await f.event({
-    type: 'output_audio_buffer.cleared',
-    response_id: 'new',
-  });
-  assert.deepEqual(
-    observed
-      .filter((event) => event.type === 'audio-cleared')
-      .slice(-2)
-      .map((event) => event.reason),
-    ['local-provider-guidance', 'local-provider-guidance'],
-  );
-});
 
-test('OpenAI local output mutes remote audio immediately and restores its prior state', () => {
-  const f = controllerFixture();
-  const speakers = [];
-  f.controller.audioEl = { muted: false };
-  f.controller.setVoiceSpeaker = (...args) => speakers.push(args);
-  assert.equal(f.controller.beginLocalOutput(), true);
-  assert.equal(f.controller.audioEl.muted, true);
-  assert.deepEqual(speakers, [['ai']]);
-  f.controller.endLocalOutput();
-  assert.equal(f.controller.audioEl.muted, false);
-  assert.deepEqual(speakers, [
-    ['ai'],
-    ['idle', { keepVisualizerSpeaker: true }],
-  ]);
 
-  f.controller.audioEl.muted = true;
-  assert.equal(f.controller.beginLocalOutput(), true);
-  f.controller.endLocalOutput();
-  assert.equal(f.controller.audioEl.muted, true);
-});
 
-test('OpenAI local output gates the physical microphone but preserves the latest request', () => {
-  const f = controllerFixture();
-  const track = { enabled: true };
-  const stream = {
-    getAudioTracks: () => [track],
-    getTracks: () => [track],
-  };
-  f.controller.status = 'listening';
-  f.controller.stream = stream;
 
-  f.controller.setMicrophoneEnabled(true);
-  assert.equal(f.controller.beginLocalOutput(), true);
-  assert.equal(track.enabled, false, 'local speech physically mutes open mic');
-  f.controller.setMicrophoneEnabled(false);
-  f.controller.setMicrophoneEnabled(true);
-  assert.equal(track.enabled, false, 'requests cannot bypass local output');
-  assert.equal(f.controller.endLocalOutput(), true);
-  assert.equal(
-    track.enabled,
-    true,
-    'the latest live-session request is restored',
-  );
 
-  assert.equal(f.controller.beginLocalOutput(), true);
-  f.controller.setMicrophoneEnabled(false);
-  f.controller.endLocalOutput();
-  assert.equal(track.enabled, false, 'a PTT release during output stays muted');
-});
 
-test('OpenAI ignores delayed speech-start VAD while local output owns the speaker', async () => {
-  const observed = [];
-  const f = controllerFixture({
-    onSessionEvent: (event) => observed.push(event),
-  });
-  let narrationCancels = 0;
-  f.controller._turns.narration = {
-    cancel: () => narrationCancels++,
-  };
-  assert.equal(f.controller.beginLocalOutput(), true);
-  await f.event({
-    type: 'input_audio_buffer.speech_started',
-    item_id: 'echo',
-  });
-  assert.equal(f.controller.userTurnPending, false);
-  assert.equal(narrationCancels, 0);
-  assert.equal(
-    observed.some(
-      (event) =>
-        event.type === 'user-turn-start' || event.type === 'interruption',
-    ),
-    false,
-  );
 
-  f.controller.endLocalOutput();
-  await f.event({
-    type: 'input_audio_buffer.speech_started',
-    item_id: 'real-user',
-  });
-  assert.equal(f.controller.userTurnPending, true);
-  assert.equal(narrationCancels, 1);
-  assert.equal(
-    observed.some((event) => event.type === 'user-turn-start'),
-    true,
-  );
-});
 
-test('OpenAI Stop prevents late local-output cleanup from reviving the mic', () => {
-  const f = controllerFixture();
-  const track = {
-    enabled: true,
-    stopped: false,
-    stop() {
-      this.stopped = true;
-    },
-  };
-  f.controller.status = 'listening';
-  f.controller.stream = {
-    getAudioTracks: () => [track],
-    getTracks: () => [track],
-  };
-  f.controller.setMicrophoneEnabled(true);
-  assert.equal(f.controller.beginLocalOutput(), true);
-  f.controller.stop();
-  assert.equal(track.stopped, true);
-  assert.equal(f.controller.endLocalOutput(), false);
-  assert.equal(track.enabled, false);
-});
 
-test('OpenAI reset clears provider ownership and stale clear attribution', async () => {
-  const observed = [];
-  const f = controllerFixture({
-    onSessionEvent: (event) => observed.push(event),
-  });
-  await f.event({ type: 'response.created', response: { id: 'old' } });
-  await f.event({ type: 'output_audio_buffer.started', response_id: 'old' });
-  assert.equal(f.controller.claimLocalProviderCommand(), true);
-  f.controller._turns.reset();
-  await f.event({ type: 'output_audio_buffer.cleared', response_id: 'old' });
-  const cleared = observed.findLast((event) => event.type === 'audio-cleared');
-  assert.equal(Object.hasOwn(cleared, 'reason'), false);
-  assert.equal(f.controller._turns.localProviderCommandClaimed, false);
-});
 
-test('OpenAI retires a late provider response after release without suppressing an interleaved fresh turn', async () => {
-  const calls = [];
-  const f = controllerFixture({
-    runner: async (name) => {
-      calls.push(name);
-      return { ok: true };
-    },
-  });
-  await f.event({
-    type: 'input_audio_buffer.speech_started',
-    item_id: 'provider-input',
-  });
-  await f.event({
-    type: 'input_audio_buffer.committed',
-    item_id: 'provider-input',
-  });
-  assert.equal(f.controller.claimLocalProviderCommand(), true);
-  f.controller.releaseLocalProviderCommand();
-  await f.event({
-    type: 'input_audio_buffer.speech_started',
-    item_id: 'fresh-input',
-  });
-  await f.event({
-    type: 'input_audio_buffer.committed',
-    item_id: 'fresh-input',
-  });
-  await f.event({ type: 'response.created', response: { id: 'late' } });
-  assert.equal(
-    f.sent.filter((message) => message.type === 'response.cancel').length,
-    1,
-  );
-  assert.equal(
-    f.sent.findLast((message) => message.type === 'response.cancel')
-      .response_id,
-    'late',
-  );
-  await f.event({
-    type: 'response.function_call_arguments.done',
-    response_id: 'late',
-    call_id: 'late-tool',
-    name: 'get_current_view_state',
-    arguments: '{}',
-  });
-  assert.deepEqual(calls, []);
-  await f.event({ type: 'response.created', response: { id: 'fresh' } });
-  assert.equal(
-    f.sent.filter((message) => message.type === 'response.cancel').length,
-    1,
-  );
-});
 
-test('an unrelated Realtime error cannot erase a retired provider response', async () => {
-  const calls = [];
-  const f = controllerFixture({
-    runner: async (name) => {
-      calls.push(name);
-      return { ok: true };
-    },
-  });
-  await f.event({
-    type: 'input_audio_buffer.speech_started',
-    item_id: 'provider-input',
-  });
-  await f.event({
-    type: 'input_audio_buffer.committed',
-    item_id: 'provider-input',
-  });
-  assert.equal(f.controller.claimLocalProviderCommand(), true);
-  f.controller.releaseLocalProviderCommand();
-  await f.event({
-    type: 'error',
-    event_id: 'server-error',
-    error: { code: 'server_error', message: 'unrelated' },
-  });
-  await f.event({ type: 'response.created', response: { id: 'late' } });
-  await f.event({
-    type: 'response.function_call_arguments.done',
-    response_id: 'late',
-    call_id: 'late-tool',
-    name: 'get_current_view_state',
-    arguments: '{}',
-  });
-  assert.equal(
-    f.sent.findLast((message) => message.type === 'response.cancel')
-      ?.response_id,
-    'late',
-  );
-  assert.deepEqual(calls, []);
-});
+
+
+
+
+
 
 test('OpenAI cancels a stale response reservation and keeps its successor current', async () => {
   const calls = [];
@@ -925,115 +645,9 @@ test('OpenAI cancels a stale response reservation and keeps its successor curren
   assert.deepEqual(calls, ['get_current_view_state']);
 });
 
-test('OpenAI local provider ownership aborts an already-running tool', async () => {
-  let toolSignal;
-  const f = controllerFixture({
-    runner: async (_name, _args, options) => {
-      toolSignal = options.signal;
-      return new Promise((_resolve, reject) => {
-        options.signal.addEventListener(
-          'abort',
-          () => {
-            const error = new Error('Provider command claimed output');
-            error.name = 'AbortError';
-            reject(error);
-          },
-          { once: true },
-        );
-      });
-    },
-  });
-  await f.event({
-    type: 'response.created',
-    response: { id: 'tool-response' },
-  });
-  const pending = f.event({
-    type: 'response.function_call_arguments.done',
-    response_id: 'tool-response',
-    call_id: 'tool-call',
-    name: 'get_current_view_state',
-    arguments: '{}',
-  });
-  for (let index = 0; index < 3 && !toolSignal; index++)
-    await Promise.resolve();
-  assert.ok(toolSignal);
-  assert.equal(f.controller.claimLocalProviderCommand(), true);
-  assert.equal(toolSignal.aborted, true);
-  await pending;
-  const output = f.sent.find(
-    (message) =>
-      message.type === 'conversation.item.create' &&
-      message.item?.type === 'function_call_output' &&
-      message.item.call_id === 'tool-call',
-  );
-  assert.ok(output);
-  assert.deepEqual(JSON.parse(output.item.output), {
-    ok: false,
-    error: 'Superseded by a local provider command',
-    tool: 'get_current_view_state',
-    action: 'get_current_view_state',
-    cancelled: true,
-    superseded: true,
-  });
-  assert.equal(
-    f.sent.some((message) => message.type === 'response.create'),
-    false,
-  );
-});
 
-test('OpenAI provider ownership settles a cancelled Radio tool silently', async () => {
-  let toolSignal;
-  let resolveTool;
-  const f = controllerFixture({
-    runner: async (_name, _args, options) => {
-      toolSignal = options.signal;
-      return new Promise((resolve) => {
-        resolveTool = resolve;
-      });
-    },
-  });
-  await f.event({
-    type: 'response.created',
-    response: { id: 'radio-response' },
-  });
-  const pending = f.event({
-    type: 'response.function_call_arguments.done',
-    response_id: 'radio-response',
-    call_id: 'radio-tool-call',
-    name: 'control_radio',
-    arguments: '{"action":"select"}',
-  });
-  for (let index = 0; index < 3 && !toolSignal; index++)
-    await Promise.resolve();
-  assert.ok(toolSignal);
-  assert.equal(f.controller.claimLocalProviderCommand(), true);
-  assert.equal(toolSignal.aborted, true);
-  resolveTool({
-    ok: true,
-    station: 'stale station',
-    enabled: true,
-    audioState: 'playing',
-    radioPlaybackRequested: true,
-  });
-  await pending;
-  const output = f.sent.find(
-    (message) =>
-      message.type === 'conversation.item.create' &&
-      message.item?.type === 'function_call_output' &&
-      message.item.call_id === 'radio-tool-call',
-  );
-  assert.ok(output);
-  const result = JSON.parse(output.item.output);
-  assert.equal(result.cancelled, true);
-  assert.equal(result.radioPlaybackRequested, false);
-  assert.equal(result.enabled, false);
-  assert.equal(result.audioState, 'stopped');
-  assert.equal('station' in result, false);
-  assert.equal(
-    f.sent.some((message) => message.type === 'response.create'),
-    false,
-  );
-});
+
+
 
 test('OpenAI cancellation never publishes a stale resolved tool payload', async () => {
   let toolSignal;
@@ -1135,5 +749,26 @@ for (const [label, cancel] of [
       f.sent.some((message) => message.type === 'response.create'),
       false,
     );
+  });
+}
+
+for (const restart of [false, true]) {
+  test(`an OpenAI transcript waiter cannot revive or write after Stop${restart ? '/replacement' : ''}`, async () => {
+    const calls = [];
+    const f = controllerFixture({runner: async (name) => {calls.push(name);return {ok:true};}});
+    await f.event({type:'input_audio_buffer.speech_started',item_id:'old-speech'});
+    await f.event({type:'input_audio_buffer.committed',item_id:'old-speech'});
+    await f.event({type:'response.created',response:{id:'old-response'}});
+    const waiting=f.event({type:'response.function_call_arguments.done',response_id:'old-response',name:'get_current_view_state',call_id:'old-call',arguments:'{}'});
+    await Promise.resolve();
+    f.controller.stop();
+    const before=f.statuses.length;
+    const successor=[];
+    if(restart) f.controller.dc={readyState:'open',send:raw=>successor.push(JSON.parse(raw)),close(){}};
+    await waiting;
+    assert.deepEqual(f.statuses.slice(before),[]);
+    assert.deepEqual(successor,[]);
+    assert.deepEqual(calls,[]);
+    f.controller.stop();
   });
 }

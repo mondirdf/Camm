@@ -276,131 +276,6 @@ test('ephemeral credentials are sent only to the fixed constrained Google endpoi
   );
 });
 
-test('Gemini local acknowledgement claims and releases speaker presentation', () => {
-  const h = harness();
-  const speakers = [];
-  h.c.input.setVoiceSpeaker = (...args) => speakers.push(args);
-  assert.equal(h.c.beginLocalOutput(), true);
-  assert.deepEqual(speakers, [['ai']]);
-  h.c.endLocalOutput();
-  assert.deepEqual(speakers, [
-    ['ai'],
-    ['idle', { keepVisualizerSpeaker: true }],
-  ]);
-});
-
-test('Gemini local acknowledgement suppresses open-mic audio and restores it after cancellation', async () => {
-  const h = harness();
-  await h.c.start();
-  const ws = h.sockets[0];
-  const audio = h.captures[0];
-  const pcm = { data: 'AAABAA==', mimeType: 'audio/pcm;rate=16000' };
-  assert.equal(h.tracks[0].enabled, true);
-  assert.equal(h.c.microphoneRequested, true);
-
-  assert.equal(h.c.beginLocalOutput(), true);
-  assert.equal(h.tracks[0].enabled, false);
-  assert.equal(h.c.captureEnabled, false);
-  assert.equal(h.c.microphoneRequested, true);
-  const mutedCount = ws.sent.length;
-  audio.callbacks.onAudio(pcm, audio.metadata);
-  assert.equal(ws.sent.length, mutedCount, 'local speech cannot feed Gemini');
-
-  assert.equal(h.c.sendTextCommand('Cancel the pending switch'), true);
-  assert.equal(
-    ws.sent.some((message) =>
-      message.clientContent?.turns?.some((turn) =>
-        turn.parts?.some((part) => part.text === 'Cancel the pending switch'),
-      ),
-    ),
-    true,
-    'a genuine typed successor still reaches Gemini',
-  );
-  h.c.endLocalOutput();
-  assert.equal(h.tracks[0].enabled, true);
-  assert.equal(h.c.captureEnabled, true);
-  assert.equal(h.c.localOutputActive, false);
-  h.c.stop();
-});
-
-test('Gemini local acknowledgement restores only the current PTT hold state', async () => {
-  const h = harness();
-  h.c.input.pushToTalkKeyHeld = true;
-  await h.c.start({ pushToTalk: true });
-  const ws = h.sockets[0];
-  const beforeMute = ws.sent.length;
-
-  assert.equal(h.c.beginLocalOutput(), true);
-  assert.equal(h.tracks[0].enabled, false);
-  assert.deepEqual(ws.sent.at(-1), {
-    realtimeInput: { activityEnd: {} },
-  });
-  h.c.endLocalOutput();
-  assert.equal(h.tracks[0].enabled, true);
-  assert.ok(ws.sent.length > beforeMute);
-  assert.deepEqual(ws.sent.at(-1), {
-    realtimeInput: { activityStart: {} },
-  });
-
-  assert.equal(h.c.beginLocalOutput(), true);
-  h.c.input.pushToTalkKeyHeld = false;
-  h.c.input.setMicrophoneEnabled(false);
-  h.c.endLocalOutput();
-  assert.equal(h.tracks[0].enabled, false);
-  assert.equal(h.c.microphoneRequested, false);
-  assert.notDeepEqual(ws.sent.at(-1), {
-    realtimeInput: { activityStart: {} },
-  });
-  h.c.stop();
-});
-
-test('Gemini Stop clears local-output ownership and cannot revive the microphone', async () => {
-  const h = harness();
-  await h.c.start();
-  assert.equal(h.c.beginLocalOutput(), true);
-  h.c.stop();
-  h.c.endLocalOutput();
-  assert.equal(h.tracks[0].readyState, 'ended');
-  assert.equal(h.c.captureEnabled, false);
-  assert.equal(h.c.microphoneRequested, false);
-  assert.equal(h.c.localOutputActive, false);
-});
-
-test('Gemini local acknowledgement ignores delayed automatic activity starts until capture resumes', async () => {
-  const h = harness();
-  await h.c.start();
-  const ws = h.sockets[0];
-  ws.message({ voiceActivity: { type: 'ACTIVITY_START' } });
-  ws.message({ voiceActivity: { type: 'ACTIVITY_END' } });
-  assert.equal(h.c.claimLocalProviderCommand(), true);
-  const claimedInput = h.c.localProviderInputId;
-  assert.ok(claimedInput);
-  assert.equal(h.c.beginLocalOutput(), true);
-  const turnsBeforeEcho = h.events.filter(
-    (event) => event.type === 'user-turn-start',
-  ).length;
-
-  ws.message({ voiceActivity: { type: 'ACTIVITY_START' } });
-  assert.equal(h.c.userActivityOpen, false);
-  assert.equal(h.c.intentItemId, null);
-  assert.equal(h.c.localProviderInputId, claimedInput);
-  assert.equal(
-    h.events.filter((event) => event.type === 'user-turn-start').length,
-    turnsBeforeEcho,
-  );
-
-  h.c.endLocalOutput();
-  ws.message({ voiceActivity: { type: 'ACTIVITY_START' } });
-  assert.equal(h.c.userActivityOpen, true);
-  assert.ok(h.c.intentItemId);
-  assert.equal(h.c.localProviderInputId, null);
-  assert.equal(
-    h.events.filter((event) => event.type === 'user-turn-start').length,
-    turnsBeforeEcho + 1,
-  );
-  h.c.stop();
-});
-
 test('PTT locks manual activity and serializes cold and repeated held turns', async () => {
   const h = harness();
   h.c.input.pushToTalkKeyHeld = true;
@@ -3859,261 +3734,36 @@ test('an expired goAway deadline rejects late output before the timer callback c
   assert.equal(h.timers.size, 0);
 });
 
-test('Gemini exposes stable first-party provider segments to the local owner', async () => {
-  const h = harness();
-  await h.c.start();
-  const ws = h.sockets[0];
-  ws.message({ voiceActivity: { type: 'ACTIVITY_START' } });
-  const inputId = h.c.intentItemId;
-  ws.message({
-    serverContent: { inputTranscription: { text: 'Switch to OpenAI' } },
-  });
-  assert.deepEqual(
-    h.events.findLast((event) => event.type === 'user-input-final'),
-    {
-      type: 'user-input-final',
-      inputKind: 'speech',
-      inputId,
-      inputScope: 'segment',
-      text: 'Switch to OpenAI',
-    },
-  );
-  assert.equal(h.c.claimLocalProviderCommand(), true);
-  assert.equal(h.c.localProviderInputId, inputId);
-  ws.message({
-    serverContent: {
-      inputTranscription: { text: ' actually keep Gemini' },
-    },
-  });
-  assert.deepEqual(
-    h.events.filter((event) => event.type === 'user-input-final').at(-1),
-    {
-      type: 'user-input-final',
-      inputKind: 'speech',
-      inputId,
-      inputScope: 'segment',
-      text: ' actually keep Gemini',
-    },
-  );
-  ws.message({ voiceActivity: { type: 'ACTIVITY_END' } });
-  ws.message({ voiceActivity: { type: 'ACTIVITY_START' } });
-  assert.equal(h.c.localProviderInputId, null);
-  h.c.stop();
-});
-
-test('Gemini discards model tools after a local provider command claim', async () => {
-  const h = harness();
-  await h.c.start();
-  const ws = h.sockets[0];
-  ws.message({ voiceActivity: { type: 'ACTIVITY_START' } });
-  ws.message({
-    serverContent: { inputTranscription: { text: 'Switch to OpenAI' } },
-  });
-  h.c.claimLocalProviderCommand();
-  ws.message({
-    toolCall: {
-      functionCalls: [
-        {
-          id: 'retired-provider-tool',
-          name: 'set_voice_provider',
-          args: { provider: 'openai' },
-        },
-      ],
-    },
-  });
-  await h.c.toolQueue;
-  assert.equal(h.calls.length, 0);
-  assert.equal(h.c.cancelledCalls.has('retired-provider-tool'), true);
-  assert.deepEqual(
-    ws.sent
-      .flatMap((frame) => frame.toolResponse?.functionResponses || [])
-      .filter((response) => response.id === 'retired-provider-tool'),
-    [
-      {
-        id: 'retired-provider-tool',
-        name: 'set_voice_provider',
-        response: {
-          ok: false,
-          status: 'cancelled',
-          error: 'Action cancelled by a local provider command',
-        },
+for (const restart of [false, true]) {
+  test(`a transcript-waiting tool cannot revive voice after Stop${restart ? '/restart' : ''}`, async () => {
+    const h = harness();
+    await h.c.start();
+    const ws = h.sockets[0];
+    ws.message({ voiceActivity: { type: 'ACTIVITY_START' } });
+    ws.message({ voiceActivity: { type: 'ACTIVITY_END' } });
+    ws.message({
+      toolCall: {
+        functionCalls: [
+          { id: 'stopped-waiter', name: 'get_current_view_state', args: {} },
+        ],
       },
-    ],
-  );
-  h.c.stop();
-});
-
-test('Gemini terminally settles a cancelled provider tool after backpressure drains', async () => {
-  const h = harness();
-  await h.c.start();
-  const ws = h.sockets[0];
-  ws.message({ voiceActivity: { type: 'ACTIVITY_START' } });
-  ws.message({
-    serverContent: { inputTranscription: { text: 'Switch to OpenAI' } },
-  });
-  h.c.claimLocalProviderCommand();
-  ws.bufferedAmount = 300000;
-  ws.message({
-    toolCall: {
-      functionCalls: [
-        {
-          id: 'queued-provider-tool',
-          name: 'set_voice_provider',
-          args: { provider: 'openai' },
-        },
-      ],
-    },
-  });
-  await h.c.toolQueue;
-  assert.equal(h.c.cancelledCalls.has('queued-provider-tool'), true);
-  assert.equal(h.c.controlQueue.length, 1);
-  h.c.releaseLocalProviderCommand();
-  h.c.sendTextCommand('fresh turn while the terminal response is queued');
-  ws.bufferedAmount = 0;
-  h.advance(25);
-  const responses = ws.sent
-    .flatMap((frame) => frame.toolResponse?.functionResponses || [])
-    .filter((response) => response.id === 'queued-provider-tool');
-  assert.equal(responses.length, 1);
-  assert.equal(responses[0].response.status, 'cancelled');
-  assert.equal(h.c.controlQueue.length, 0);
-  h.c.stop();
-});
-
-test('Gemini local provider ownership clears Radio and terminally settles issued tools once', async () => {
-  const action = deferred();
-  let actionOptions;
-  const h = harness({
-    runAction: async (_name, _args, options) => {
-      actionOptions = options;
-      return action.promise;
-    },
-  });
-  await h.c.start();
-  const ws = h.sockets[0];
-  h.c.sendTextCommand('start an action');
-  ws.message({
-    toolCall: {
-      functionCalls: [
-        {
-          id: 'running-radio-tool',
-          name: 'control_radio',
-          args: { action: 'stop' },
-        },
-      ],
-    },
-  });
-  await tick();
-  const prepared = {
-    ok: true,
-    action: 'control_radio',
-    radioAction: 'play',
-    radioPlaybackRequested: true,
-    station: 'stale-station-must-not-leak',
-  };
-  h.c.radio.setPendingPlayback(prepared);
-  h.c.radio.radioHandoffInFlight = true;
-  h.c.radio.radioHandoffInFlightResult = prepared;
-  h.c.radio.radioHandoffAttemptId = 'stale-attempt';
-  assert.equal(h.c.radio.radioToolHandoffReservations.size, 1);
-  assert.equal(h.c.claimLocalProviderCommand(), true);
-  assert.equal(actionOptions.signal.aborted, true);
-  assert.equal(h.c.radio.radioToolHandoffReservations.size, 0);
-  assert.equal(h.c.radio.pendingRadioPlaybackResult, null);
-  assert.equal(h.c.radio.radioHandoffInFlight, false);
-  assert.equal(h.c.radio.radioHandoffInFlightResult, null);
-  assert.equal(h.c.beginLocalOutput(), true);
-  h.c.endLocalOutput();
-
-  ws.message({
-    toolCall: {
-      functionCalls: [
-        {
-          id: 'late-provider-tool',
-          name: 'fly_to_location',
-          args: { location: 'stale' },
-        },
-      ],
-    },
-  });
-  action.resolve({
-    ok: true,
-    action: 'control_radio',
-    radioPlaybackRequested: true,
-    station: 'stale-station-must-not-leak',
-  });
-  await h.c.toolQueue;
-  const responses = ws.sent
-    .flatMap((frame) => frame.toolResponse?.functionResponses || [])
-    .filter((response) =>
-      ['running-radio-tool', 'late-provider-tool'].includes(response.id),
+    });
+    await tick();
+    const pending = h.c.toolQueue;
+    assert.equal(h.c.pendingTools, 1);
+    h.c.stop();
+    const boundary = h.events.length;
+    const successor = restart ? h.c.start() : null;
+    await pending;
+    assert.equal(
+      h.events
+        .slice(boundary)
+        .some((event) => event.type === 'state' && event.state === 'listening'),
+      false,
     );
-  assert.deepEqual(responses.map((response) => response.id).sort(), [
-    'late-provider-tool',
-    'running-radio-tool',
-  ]);
-  assert.ok(
-    responses.every(
-      (response) =>
-        response.response.ok === false &&
-        response.response.status === 'cancelled' &&
-        !('result' in response.response) &&
-        !('say' in response.response) &&
-        !('data' in response.response) &&
-        !('station' in response.response) &&
-        !('enabled' in response.response) &&
-        !('audioState' in response.response),
-    ),
-  );
-  assert.equal(h.c.radio.pendingRadioPlaybackResult, null);
-  h.c.releaseLocalProviderCommand();
-  ws.message({ serverContent: { interrupted: true, turnComplete: true } });
-  assert.equal(h.c.sendTextCommand('What is in view?'), true);
-  ws.message({
-    serverContent: {
-      outputTranscription: { text: 'The fresh turn works.' },
-      turnComplete: true,
-    },
+    assert.deepEqual(h.calls, []);
+    assert.equal(h.c.pendingTools, 0);
+    if (successor) await successor;
+    h.c.stop();
   });
-  assert.equal(
-    h.events.some(
-      (event) =>
-        event.type === 'transcript' &&
-        event.role === 'assistant' &&
-        event.text === 'The fresh turn works.',
-    ),
-    true,
-  );
-  h.c.stop();
-});
-
-test('Gemini late provider transcription after turn completion cannot retire the next turn', async () => {
-  const h = harness();
-  await h.c.start();
-  const ws = h.sockets[0];
-  ws.message({ voiceActivity: { type: 'ACTIVITY_START' } });
-  ws.message({ voiceActivity: { type: 'ACTIVITY_END' } });
-  ws.message({ serverContent: { turnComplete: true } });
-  assert.equal(h.c.replyPending, false);
-  assert.equal(h.c.retiredReplyPending, false);
-  assert.equal(h.c.claimLocalProviderCommand(), true);
-  assert.equal(h.c.retiredReplyPending, false);
-  h.c.releaseLocalProviderCommand();
-  assert.equal(h.c.sendTextCommand('What is in view?'), true);
-  ws.message({
-    serverContent: {
-      outputTranscription: { text: 'The next turn works.' },
-      turnComplete: true,
-    },
-  });
-  assert.equal(
-    h.events.some(
-      (event) =>
-        event.type === 'transcript' &&
-        event.role === 'assistant' &&
-        event.text === 'The next turn works.',
-    ),
-    true,
-  );
-  h.c.stop();
-});
+}

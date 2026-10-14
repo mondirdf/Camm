@@ -80,12 +80,7 @@ test('markup: the card nests inside the voice control with every element and a p
   assert.ok(root >= 0 && card > root, 'the card is part of the voice control markup');
   for (const id of [
     'gev-voice-card-phase',
-    'gev-voice-panel',
-    'gev-voice-preview-panel',
-    'gev-voice-preview-empty',
-    'gev-voice-preview-tab',
-    'gev-voice-settings-tab',
-    'gev-voice-settings-close',
+    'gev-voice-card-dismiss',
     'gev-voice-card-user-text',
     'gev-voice-card-assistant-text',
     'gev-voice-card-plan',
@@ -98,14 +93,7 @@ test('markup: the card nests inside the voice control with every element and a p
     assert.match(controlSource, new RegExp(`id="${id}"`), `${id} is missing`);
   }
   assert.match(controlSource, /id="gev-voice-card-live"[^>]*aria-live="polite"/);
-  assert.match(controlSource, /id="gev-voice-panel"[^>]*data-panel-popup/);
-  assert.match(controlSource, /id="gev-voice-preview-panel"[^>]*role="tabpanel"[^>]*aria-labelledby="gev-voice-preview-tab"/);
-  assert.match(controlSource, /id="gev-voice-settings-panel"[^>]*role="tabpanel"[^>]*aria-labelledby="gev-voice-settings-tab"/);
-  assert.equal((controlSource.match(/id="gev-voice-settings-close"/g) || []).length, 1, 'one common panel close button');
-  assert.doesNotMatch(controlSource, /id="gev-voice-card-dismiss"/, 'the renderer has no competing close button');
-  assert.match(controlSource, /aria-label="Close voice panel"/);
-  assert.ok(controlSource.indexOf('id="gev-voice-preview-panel"') < card);
-  assert.match(css, /#gev-voice-control \.gev-voice-card \{\s*position: static;/);
+  assert.match(controlSource, /aria-label="Dismiss voice card"/);
   assert.match(css, /#gev-voice-control \.gev-voice-card \{/);
   assert.match(css, /body\.recording-mode #gev-voice-control/, 'recording mode hides the control, card included');
   assert.match(css, /body\.ui-clean-view #command-dock/, 'Clean-UI hides the dock, card included');
@@ -196,95 +184,6 @@ test('controls: a control without card markup is inert', () => {
   const card = new VoiceCardControls({ root: { querySelector: () => null } });
   assert.doesNotThrow(() => card.handle({ type: 'interruption' }));
   card.destroy();
-});
-
-function previewCardFixture(t) {
-  const { root, nodes } = fakeRoot();
-  const timers = new Map();
-  let nextId = 1;
-  const card = new VoiceCardControls({
-    root,
-    setTimer(fn) {
-      const id = nextId++;
-      timers.set(id, () => {
-        timers.delete(id);
-        fn();
-      });
-      return id;
-    },
-    clearTimer: (id) => timers.delete(id),
-  });
-  t.after(() => card.destroy());
-  return { card, nodes, timers };
-}
-
-test('controls: disabled preview stays hidden and silent while retaining the current turn', (t) => {
-  const { card, nodes, timers } = previewCardFixture(t);
-  assert.equal(card.enabled, true);
-  card.handle({ type: 'transcript', role: 'assistant', text: 'Old reply', final: true });
-  assert.equal(nodes.get('gev-voice-card').hidden, false);
-  assert.equal(nodes.get('gev-voice-card-live').textContent, 'Old reply');
-  card.setEnabled(false);
-  assert.equal(card.enabled, false);
-  assert.equal(nodes.get('gev-voice-card').hidden, true);
-  assert.equal(nodes.get('gev-voice-card-live').textContent, '');
-  for (const event of [
-    { type: 'interruption' },
-    { type: 'transcript', role: 'user', text: 'Fly to Tokyo', final: true },
-    { type: 'action-call', name: 'fly_to_location', callId: 'new', arguments: { query: 'Tokyo' } },
-    { type: 'progress', name: 'fly_to_location', callId: 'new', step: 'search', label: 'Tokyo' },
-    { type: 'action-result', name: 'fly_to_location', callId: 'new', result: { ok: true, display: { title: 'Tokyo', lines: ['Arrived'] } } },
-    { type: 'transcript', role: 'assistant', text: 'You are in Tokyo.', final: true },
-  ]) {
-    card.handle(event);
-    assert.equal(nodes.get('gev-voice-card').hidden, true, event.type);
-    assert.equal(nodes.get('gev-voice-card-live').textContent, '', event.type);
-    assert.equal(card.snapshot().visible, false, event.type);
-    assert.equal(card.snapshot().announce, '', event.type);
-  }
-  assert.equal(card.snapshot().result.title, 'Tokyo', 'hidden events still reduce');
-  assert.equal(card.snapshot().steps[0].status, 'done');
-  const deadline = [...timers.keys()];
-  card.setEnabled(true);
-  assert.equal(nodes.get('gev-voice-card').hidden, false);
-  assert.equal(card.snapshot().visible, true);
-  assert.equal(card.snapshot().assistant.text, 'You are in Tokyo.');
-  assert.equal(nodes.get('gev-voice-card-live').textContent, 'You are in Tokyo.');
-  assert.deepEqual([...timers.keys()], deadline, 'toggling does not extend the current turn deadline');
-});
-
-test('controls: disabled preview still expires and cannot resurrect expired or dismissed cards', (t) => {
-  const { card, nodes, timers } = previewCardFixture(t);
-  card.setEnabled(false);
-  card.handle({ type: 'transcript', role: 'assistant', text: 'A brief result', final: true });
-  assert.equal(timers.size, 1, 'hidden previews retain their idle timer');
-  [...timers.values()][0]();
-  assert.equal(timers.size, 0);
-  card.setEnabled(true);
-  assert.equal(card.snapshot().visible, false);
-  assert.equal(nodes.get('gev-voice-card').hidden, true);
-  card.handle({ type: 'interruption' });
-  card.setEnabled(false);
-  card.handle({ type: 'dismiss' });
-  card.handle({ type: 'transcript', role: 'assistant', text: 'Late update', final: true });
-  card.setEnabled(true);
-  assert.equal(card.snapshot().visible, false, 'dismissal survives hidden late events');
-  assert.equal(nodes.get('gev-voice-card').hidden, true);
-  assert.equal(timers.size, 0);
-});
-
-test('controls: stopping voice while preview is disabled clears the old turn before re-enable', (t) => {
-  const { card, nodes, timers } = previewCardFixture(t);
-  card.setEnabled(false);
-  card.handle({ type: 'transcript', role: 'assistant', text: 'Previous session', final: true });
-  card.handle({ type: 'state', state: 'idle' });
-  card.setEnabled(true);
-  assert.equal(nodes.get('gev-voice-card').hidden, true);
-  assert.equal(nodes.get('gev-voice-card-live').textContent, '');
-  assert.equal(card.snapshot().assistant.text, '');
-  assert.equal(timers.size, 0);
-  card.handle({ type: 'interruption' });
-  assert.equal(card.snapshot().visible, true, 'the next turn can show preview normally');
 });
 
 test('presentation: concurrent calls of one tool update their own steps', () => {

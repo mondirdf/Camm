@@ -13,9 +13,6 @@
  * Orbit circles the current screen-center ground target holding range and
  * pitch while advancing heading (per-frame camera.lookAt; the lookAt
  * transform is cleared on every stop so manual control returns cleanly).
- * Globe rotation turns the world-frame camera about its screen-up axis through
- * Earth's center, preserving range and framing. Left/right name the visible
- * globe motion, opposite to the camera's travel around Earth.
  */
 
 import * as Cesium from 'cesium';
@@ -1165,11 +1162,7 @@ function onTick() {
       else if (m.direction === 'right') cam.moveRight(step);
       else if (m.direction === 'up') cam.moveUp(step);
       else cam.moveDown(step);
-    } else if (
-      m.kind === 'tilt' ||
-      m.kind === 'rotate' ||
-      m.kind === 'rotate_globe'
-    ) {
+    } else if (m.kind === 'tilt' || m.kind === 'rotate') {
       const degS = TILT_DEG_S[m.speed];
       const stepRad =
         m.mode === 'once'
@@ -1179,12 +1172,7 @@ function onTick() {
             (scale - (m.lastScale || 0))
           : Cesium.Math.toRadians(degS) * dt;
       m.lastScale = scale;
-      if (m.kind === 'rotate_globe') {
-        // Cesium rotates both position and basis about the reference-frame
-        // origin. The captured screen-up axis keeps left/right horizontal even
-        // in a tilted or rolled view; a positive angle moves the globe right.
-        cam.rotate(m.rotationAxis, m.direction === 'left' ? -stepRad : stepRad);
-      } else if (m.kind === 'tilt') {
+      if (m.kind === 'tilt') {
         const up = m.direction === 'up';
         // Clamp pitch to [-89°, -5°]: never through the ground, never at the sky.
         const next = cam.pitch + (up ? stepRad : -stepRad);
@@ -1282,16 +1270,15 @@ export function moveCamera(args = {}, runNavigation = null) {
     };
     return typeof runNavigation === 'function' ? runNavigation(stop) : stop();
   }
-  if (!['orbit', 'pan', 'tilt', 'rotate', 'rotate_globe'].includes(motion)) {
+  if (!['orbit', 'pan', 'tilt', 'rotate'].includes(motion)) {
     return {
       ok: false,
       action: 'move_camera',
-      error: `Unknown motion "${args.motion}" — use orbit, pan, tilt, rotate, rotate_globe, or stop.`,
+      error: `Unknown motion "${args.motion}" — use orbit, pan, tilt, rotate, or stop.`,
     };
   }
   if (
     motion !== 'orbit' &&
-    motion !== 'rotate_globe' &&
     !['left', 'right', 'up', 'down'].includes(direction)
   ) {
     return {
@@ -1305,17 +1292,6 @@ export function moveCamera(args = {}, runNavigation = null) {
       ok: false,
       action: 'move_camera',
       error: 'rotate needs left or right.',
-    };
-  }
-  if (
-    motion === 'rotate_globe' &&
-    direction !== null &&
-    !['left', 'right'].includes(direction)
-  ) {
-    return {
-      ok: false,
-      action: 'move_camera',
-      error: 'rotate_globe needs left or right.',
     };
   }
   if (motion === 'tilt') {
@@ -1342,7 +1318,7 @@ export function moveCamera(args = {}, runNavigation = null) {
     }
   }
   if (
-    (motion === 'orbit' || motion === 'rotate_globe') &&
+    motion === 'orbit' &&
     _viewer?.trackedEntity &&
     typeof runNavigation !== 'function'
   ) {
@@ -1356,26 +1332,8 @@ export function moveCamera(args = {}, runNavigation = null) {
     return {
       ok: false,
       action: 'move_camera',
-      error: `Already following ${label} — the follow camera owns the view while tracking. Say "stop tracking" first if you want ${motion === 'rotate_globe' ? 'to rotate the globe' : 'a free orbit'}.`,
+      error: `Already following ${label} — the follow camera owns the view while tracking. Say "stop tracking" first if you want a free orbit.`,
     };
-  }
-  if (motion === 'rotate_globe') {
-    const maximumRadius =
-      _viewer.scene.globe?.ellipsoid?.maximumRadius ??
-      Cesium.Ellipsoid.WGS84.maximumRadius;
-    // Screen-relative rotation can change latitude. A fixed geocentric radius
-    // inside this bounding sphere could cross the oblate ellipsoid, so refuse
-    // before releasing the current owner. This does not promise terrain clearance.
-    if (
-      Cesium.Cartesian3.magnitude(_viewer.camera.positionWC) <= maximumRadius
-    ) {
-      return {
-        ok: false,
-        action: 'move_camera',
-        error:
-          'Zoom out before rotating the globe, or use orbit for this local view.',
-      };
-    }
   }
   const start = () => {
     interruptCameraMotion('replaced');
@@ -1385,15 +1343,6 @@ export function moveCamera(args = {}, runNavigation = null) {
       speed,
       mode,
     };
-    if (motion === 'rotate_globe') {
-      // Convert an inherited ground-target frame without changing the world
-      // pose. Rotation must pivot about Earth, never the previous local target.
-      _viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
-      state.rotationAxis = Cesium.Cartesian3.normalize(
-        _viewer.camera.upWC,
-        new Cesium.Cartesian3(),
-      );
-    }
     if (motion === 'orbit') {
       if (_viewer.scene.tweens.length > 0) {
         // A camera flight is in progress ("fly to X and orbit it") — ALWAYS arm

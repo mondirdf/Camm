@@ -70,9 +70,8 @@ export class VoiceCardControls {
     idleMs = VOICE_CARD_IDLE_MS,
     setTimer = (fn, ms) => setTimeout(fn, ms),
     clearTimer = (id) => clearTimeout(id),
-    onRender,
   }) {
-    Object.assign(this, { idleMs, setTimer, clearTimer, onRender });
+    Object.assign(this, { idleMs, setTimer, clearTimer });
     this.elements = Object.fromEntries(
       Object.entries(ELEMENT_IDS).map(([key, id]) => [
         key,
@@ -80,8 +79,6 @@ export class VoiceCardControls {
       ]),
     );
     this.state = initialVoiceCardState();
-    this.enabled = true;
-    this.presented = true;
     this.hideTimer = null;
     this.destroyed = false;
     this.listeners = new AbortController();
@@ -110,20 +107,6 @@ export class VoiceCardControls {
     this.handle({ type: 'outline', id: event?.id, status: event?.status });
   }
 
-  /** Change presentation only; session events and the idle deadline continue. */
-  setEnabled(enabled) {
-    if (this.destroyed || !this.elements.card) return;
-    this.enabled = Boolean(enabled);
-    this.render();
-  }
-
-  /** View selection changes presentation without changing the saved preference. */
-  setPresented(presented) {
-    if (this.destroyed || this.presented === presented) return;
-    this.presented = presented;
-    this.render();
-  }
-
   scheduleIdle() {
     this.cancelIdle();
     this.hideTimer = this.setTimer(() => {
@@ -146,7 +129,7 @@ export class VoiceCardControls {
 
   render() {
     const el = this.elements;
-    const view = this.snapshot();
+    const view = voiceCardView(this.state);
     setHidden(el.card, !view.visible);
     el.card.dataset.busy = String(view.busy);
     setText(el.phase, view.phase);
@@ -203,15 +186,11 @@ export class VoiceCardControls {
       node.textContent = note;
     });
     setText(el.live, view.announce);
-    this.onRender?.();
   }
 
   /** Test/diagnostic view of what the card shows. */
   snapshot() {
-    const view = voiceCardView(this.state);
-    return this.enabled && this.presented
-      ? view
-      : { ...view, visible: false, announce: '' };
+    return voiceCardView(this.state);
   }
 
   /** Idempotent: removes listeners and the idle timer; markup stays owned by the control. */

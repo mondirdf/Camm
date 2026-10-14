@@ -81,8 +81,6 @@ export class RealtimeTurns {
     this.bestEffortEventIds = new Set();
     this.bestEffortSequence = 0;
     this.userTurnIntent = createVoiceUserTurnTracker();
-    this.localProviderCommandClaimed = false;
-    this.localProviderCommandEpoch = 0;
     this.responseRequestSequence = 0;
     this.outputClearReasons = [];
   }
@@ -256,19 +254,6 @@ export class RealtimeTurns {
     } catch {
       return;
     }
-    // A local acknowledgement owns the speaker with the outbound microphone
-    // physically muted. Discard a server VAD edge already queued before that
-    // mute so the app cannot interrupt itself or mint a synthetic user turn.
-    if (
-      payload.type === 'input_audio_buffer.speech_started' &&
-      this.readLocalOutputActive?.()
-    ) {
-      this.debugLog('server.speech_started.ignored_local_output', {
-        eventId: payload.event_id || null,
-        itemId: payload.item_id || null,
-      });
-      return;
-    }
     const progressEvent = this.isProgressEvent(payload);
     if (!progressEvent) {
       if (payload.type === 'output_audio_buffer.cleared') {
@@ -423,12 +408,7 @@ export class RealtimeTurns {
       this.beginPointerTurn?.('speech_start');
     }
     this.updateResponseState(payload);
-    if (
-      payload.type === 'response.created' &&
-      (this.localProviderCommandClaimed ||
-        responseBinding === 'retired' ||
-        responseBinding === 'stale')
-    ) {
+    if (payload.type === 'response.created' && responseBinding === 'stale') {
       this.supersedeActiveResponseForUserTurn();
       this.cancelResponse(this.activeResponseId);
     }
@@ -513,6 +493,7 @@ export class RealtimeTurns {
 
     const responseIntent =
       await this.userTurnIntent.waitForResponse(toolResponseId);
+    if (!this.ownsConversation(eventChannel) || this.isSessionEnding()) return;
     if (['stale', 'unresolved'].includes(responseIntent.status)) {
       this.pruneProcessedCalls();
       let lastRefusal = null;
@@ -565,7 +546,6 @@ export class RealtimeTurns {
       let radioHandoffEpochAtStart = this.radio.radioHandoffEpoch;
       let toolController = null;
       let toolOwnedAtSettlement = true;
-      const localProviderEpochAtStart = this.localProviderCommandEpoch;
       let radioOwnershipClaimed = false;
       let radioReservationToken = null;
       let isRadioFeatureCall = call.name === 'control_radio';
@@ -746,12 +726,7 @@ export class RealtimeTurns {
         releaseCancelledReservation();
         return;
       }
-      const providerClaimedDuringTool =
-        localProviderEpochAtStart !== this.localProviderCommandEpoch;
-      if (
-        providerClaimedDuringTool ||
-        (toolController && !toolOwnedAtSettlement)
-      ) {
+      if (toolController && !toolOwnedAtSettlement) {
         releaseCancelledReservation();
         // Every emitted function call needs one terminal output or the same
         // provider session can retain a dangling call. Settle cancellation
@@ -779,9 +754,7 @@ export class RealtimeTurns {
                   : {}),
               }
             : {}),
-          error: providerClaimedDuringTool
-            ? 'Superseded by a local provider command'
-            : 'Superseded by a newer command from the operator',
+          error: 'Superseded by a newer command from the operator',
           ...lifecycleSummary,
           ...(isRadioFeatureCall
             ? {
@@ -1116,31 +1089,6 @@ export class RealtimeTurns {
     return true;
   }
 
-  /** Retire model output for a provider command now owned by the local app. */
-  claimLocalProviderCommand() {
-    if (!this.dc || this.dc.readyState !== 'open') return false;
-    this.localProviderCommandClaimed = true;
-    this.userTurnIntent.retireCurrentResponse();
-    this.pendingResponseInstructions = null;
-    this.pendingUserTextResponse = false;
-    this.narration?.cancel();
-    this.cancelRadioHandoff({ abortTools: true });
-    this.localProviderCommandEpoch++;
-    const responseId = this.activeResponseId;
-    if (this.responseActive || this.responseCreatePending) {
-      this.supersedeActiveResponseForUserTurn();
-      this.cancelResponse(responseId);
-    }
-    if (this.assistantAudioPlaying) {
-      this.clearOutputBuffer('local-provider-guidance');
-    }
-    return true;
-  }
-
-  releaseLocalProviderCommand() {
-    this.localProviderCommandClaimed = false;
-  }
-
   sendToolOutput(callId, result) {
     if (!callId || !this.dc || this.dc.readyState !== 'open') return false;
     this.sendRealtimeEvent(
@@ -1290,7 +1238,6 @@ export class RealtimeTurns {
     this.progressResponse = null;
     this.progressResponseIds.clear();
     this.bestEffortEventIds.clear();
-    this.localProviderCommandClaimed = false;
     this.outputClearReasons.length = 0;
   }
 }

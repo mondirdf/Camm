@@ -162,7 +162,6 @@ export class GeminiSessionController {
     this.captureGeneration = 0;
     this.captureEnabled = false;
     this.microphoneRequested = false;
-    this.localOutputActive = false;
     this.captureOwner = null;
     this.userActivityOpen = false;
     this.pointerSentKey = null;
@@ -171,8 +170,6 @@ export class GeminiSessionController {
     this.userTurns = createVoiceUserTurnTracker({ setTimer, clearTimer });
     this.intentSequence = 0;
     this.intentItemId = null;
-    this.localProviderInputId = null;
-    this.localProviderRetirementPending = false;
     this.intentResponseId = null;
     this.intentCaptureId = null;
     this.intentAmbiguous = false;
@@ -194,8 +191,6 @@ export class GeminiSessionController {
       readStatus: () => this.status,
       operations: {
         isActive: () => this.isActive(),
-        noteVoiceActivity: (activity) =>
-          this.emit({ type: 'activity', ...activity }),
         start: (settings) => this.start(settings),
         setStatus: (...args) => this.setStatus(...args),
         pauseRadioForVoice: () => this.radio.pauseRadioForVoice(),
@@ -231,9 +226,7 @@ export class GeminiSessionController {
     };
     this.input.setMicrophoneEnabled = (enabled) => {
       this.microphoneRequested = Boolean(enabled) && !this.goAway;
-      this.applyMicrophoneEnabled(
-        this.microphoneRequested && !this.localOutputActive,
-      );
+      this.applyMicrophoneEnabled(this.microphoneRequested);
     };
     this.radio = new RealtimeRadio({
       readRadioLayer: () => radioLayer,
@@ -553,12 +546,7 @@ export class GeminiSessionController {
       let activityCaptureId = null;
       const audio = this.createAudio({
         onAudioStart: (metadata) => {
-          if (
-            !this.owns(epoch) ||
-            this.localOutputActive ||
-            !this.acceptsCapture(metadata)
-          )
-            return;
+          if (!this.owns(epoch) || !this.acceptsCapture(metadata)) return;
           if (!pushToTalk || activityCaptureId === metadata.captureId) return;
           const context = this.captureOwner.context;
           if (!this.sendPointerContext(context, metadata)) return;
@@ -570,12 +558,7 @@ export class GeminiSessionController {
           if (accepted) activityCaptureId = metadata.captureId;
         },
         onAudio: (chunk, metadata) => {
-          if (
-            !this.owns(epoch) ||
-            this.localOutputActive ||
-            !this.acceptsCapture(metadata)
-          )
-            return;
+          if (!this.owns(epoch) || !this.acceptsCapture(metadata)) return;
           if (!pushToTalk || activityCaptureId === metadata.captureId) {
             const sent = this.sendUserInput(
               {
@@ -779,37 +762,11 @@ export class GeminiSessionController {
     this.setStatus('error', detail, recovery);
   }
 
-  settleLocalProviderTool(call) {
-    if (!call?.id || this.cancelledCalls.has(call.id)) return false;
-    this.cancelledCalls.add(call.id);
-    if (this.cancelledCalls.size > 256)
-      this.cancelledCalls.delete(this.cancelledCalls.values().next().value);
-    return this.send(
-      {
-        toolResponse: {
-          functionResponses: [
-            {
-              id: call.id,
-              name: call.name,
-              response: {
-                ok: false,
-                status: 'cancelled',
-                error: 'Action cancelled by a local provider command',
-              },
-            },
-          ],
-        },
-      },
-      { durable: true },
-    );
-  }
-
-  abortTools({ settleLocalProvider = false } = {}) {
+  abortTools() {
     this.narration?.cancel();
     this.turn++;
     this.pruneControls();
     for (const entry of this.tools.values()) {
-      if (settleLocalProvider) this.settleLocalProviderTool(entry.call);
       entry.abort();
     }
     this.tools.clear();
@@ -837,52 +794,6 @@ export class GeminiSessionController {
     return true;
   }
 
-  /** Retire model output for a provider command now owned by the local app. */
-  claimLocalProviderCommand() {
-    if (!this.isActive() || this.channel?.readyState !== 'open') return false;
-    this.retiredReplyPending = this.retiredReplyPending || this.replyPending;
-    this.localProviderRetirementPending = true;
-    this.modelComplete = false;
-    this.pendingCompletionStatus = null;
-    this.postToolOutput = false;
-    // Local acknowledgement owns the speaker. Revoke every prepared, reserved,
-    // and in-flight Radio handoff before claiming it, and settle issued Gemini
-    // calls because same-provider/unsupported commands keep this session alive.
-    this.radio.cancelRadioHandoff();
-    this.abortTools({ settleLocalProvider: true });
-    this.userTurns.invalidate();
-    this.localProviderInputId = this.intentItemId;
-    this.intentItemId = null;
-    this.intentResponseId = null;
-    this.intentCaptureId = null;
-    this.intentTranscriptSeen = false;
-    this.audio?.clearPlayback();
-    return true;
-  }
-
-  releaseLocalProviderCommand() {
-    this.localProviderInputId = null;
-    if (!this.retiredReplyPending) this.localProviderRetirementPending = false;
-  }
-
-  beginLocalOutput() {
-    if (this.localOutputActive || !this.radio.mayVoiceClaimSpeaker())
-      return false;
-    this.localOutputActive = true;
-    this.applyMicrophoneEnabled(false);
-    this.input.setVoiceSpeaker('ai');
-    return true;
-  }
-
-  endLocalOutput() {
-    if (this.localOutputActive) {
-      this.localOutputActive = false;
-      if (!this.disposed && this.channel?.readyState === 'open')
-        this.applyMicrophoneEnabled(this.microphoneRequested);
-    }
-    this.input.setVoiceSpeaker('idle', { keepVisualizerSpeaker: true });
-  }
-
   interrupt(reason = 'user-speech') {
     if (this.goAway) return;
     if (['push-to-talk', 'user-text'].includes(reason))
@@ -898,7 +809,6 @@ export class GeminiSessionController {
     this.clearDeferredInput();
     this.abortTools();
     this.userTurns.invalidate();
-    this.localProviderInputId = null;
     this.intentItemId = null;
     this.intentResponseId = null;
     this.intentCaptureId = null;
@@ -1004,7 +914,6 @@ export class GeminiSessionController {
     if (!this.input.pushToTalkMode && !this.goAway) {
       if (
         message.voiceActivity?.type === 'ACTIVITY_START' &&
-        !this.localOutputActive &&
         !this.userActivityOpen
       ) {
         this.userActivityOpen = true;
@@ -1031,7 +940,7 @@ export class GeminiSessionController {
     // Input transcription is independent of generation and has no guaranteed
     // ordering. Preserve it even when this frame closes the retired reply.
     if (content?.inputTranscription?.text) {
-      const localInputId = this.intentItemId || this.localProviderInputId;
+      const localInputId = this.intentItemId;
       if (localInputId)
         this.emit({
           type: 'user-input-final',
@@ -1074,15 +983,9 @@ export class GeminiSessionController {
         this.seenCalls.add(call.id);
         if (this.seenCalls.size > 256)
           this.seenCalls.delete(this.seenCalls.values().next().value);
-        if (this.localProviderRetirementPending)
-          this.settleLocalProviderTool(call);
-        else {
-          this.cancelledCalls.add(call.id);
-          if (this.cancelledCalls.size > 256)
-            this.cancelledCalls.delete(
-              this.cancelledCalls.values().next().value,
-            );
-        }
+        this.cancelledCalls.add(call.id);
+        if (this.cancelledCalls.size > 256)
+          this.cancelledCalls.delete(this.cancelledCalls.values().next().value);
       }
       // Gemini documents interrupted -> turnComplete. Discard all retired
       // output, including content coalesced with either marker. A natural
@@ -1090,7 +993,6 @@ export class GeminiSessionController {
       if (content?.turnComplete) {
         this.clearRetiredBoundaryWait();
         this.retiredReplyPending = false;
-        this.localProviderRetirementPending = false;
         this.replyPending = false;
         if (this.goAway) {
           this.clearDeferredInput();
@@ -1217,6 +1119,7 @@ export class GeminiSessionController {
     const responseIntent = await this.userTurns.waitForResponse(responseId, {
       signal: toolSignal,
     });
+    if (!this.owns(epoch) || turn !== this.turn) return;
     if (['stale', 'unresolved'].includes(responseIntent.status)) {
       if (this.tools.get(call.id) === action) {
         this.tools.delete(call.id);
@@ -1789,7 +1692,6 @@ export class GeminiSessionController {
     // Gemini has no provider response/item IDs. Only a known first-party onset
     // mints a synthetic item; uncorrelated late transcription cannot mint one.
     this.clearSettledSpeechIntent();
-    this.localProviderInputId = null;
     this.userTurns.reset();
     this.intentItemId = `gemini-input-${this.epoch}-${++this.intentSequence}`;
     this.intentResponseId = null;
@@ -1813,7 +1715,6 @@ export class GeminiSessionController {
 
   bindTextIntent() {
     this.clearSettledSpeechIntent();
-    this.localProviderInputId = null;
     this.intentResponseId = `gemini-response-${this.epoch}-${++this.intentSequence}`;
     this.userTurns.expectResponse();
     this.userTurns.bindResponse(this.intentResponseId);
@@ -1915,8 +1816,6 @@ export class GeminiSessionController {
     if (this.disposed) return;
     this.epoch++;
     this.userTurns.reset();
-    this.localProviderInputId = null;
-    this.localProviderRetirementPending = false;
     this.clearSettledSpeechIntent();
     this.intentAmbiguous = false;
     this.intentTranscriptSeen = false;
@@ -1981,7 +1880,6 @@ export class GeminiSessionController {
     this.manualInputKind = null;
     this.captureEnabled = false;
     this.microphoneRequested = false;
-    this.localOutputActive = false;
     this.captureOwner = null;
     this.userActivityOpen = false;
     this.pointerSentKey = null;
@@ -2008,7 +1906,7 @@ export function createGeminiSession(options) {
       costControls: false,
       pushToTalk: true,
       advisoryLimit:
-        'Gemini Live connections are limited to roughly 10 minutes. goAway.timeLeft is the authoritative warning before termination.',
+        'Gemini voice sessions have a time limit. When a session expires, start voice again for a new conversation.',
     },
     start: (settings) => controller.start(settings),
     getStartOptions: () => ({
@@ -2017,10 +1915,6 @@ export function createGeminiSession(options) {
     stop: (settings) => controller.stop(settings),
     sendText: (text) => controller.sendTextCommand(text),
     sendMapEvent: (event) => controller.notifyMapEvent(event),
-    claimLocalProviderCommand: () => controller.claimLocalProviderCommand(),
-    releaseLocalProviderCommand: () => controller.releaseLocalProviderCommand(),
-    beginLocalOutput: () => controller.beginLocalOutput(),
-    endLocalOutput: () => controller.endLocalOutput(),
     ignoreButtonClick: () => Boolean(controller.spaceKeyHeld),
     bindControls: () => controller.input.bindPushToTalkShortcut(),
   };

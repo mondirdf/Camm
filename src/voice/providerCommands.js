@@ -44,7 +44,6 @@ export function createProviderCommands(options, { bind, factories, storage }) {
       options.signal?.removeEventListener('abort', destroy);
     }
     try {
-      current?.cancelDeferredVoiceSettings?.();
       current?.session.stop(settings);
     } finally {
       if (settings.removeUi) {
@@ -57,9 +56,6 @@ export function createProviderCommands(options, { bind, factories, storage }) {
   const selectProvider = (next) => {
     if (disposed || !supportedProviders.includes(next) || next === provider)
       return false;
-    const panelState = current?.getVoicePanelOrderState?.();
-    const voicePreviewEnabled = current?.getVoicePreviewEnabled?.();
-    const voiceInactivityMinutes = current?.getVoiceInactivityMinutes?.();
     const resume = voiceEnabled && current.session.isActive();
     // Carry the input mode, never a held key, microphone or conversation.
     const pushToTalk = Boolean(
@@ -72,11 +68,7 @@ export function createProviderCommands(options, { bind, factories, storage }) {
     } catch {
       /* Storage is optional. */
     }
-    mount({
-      voiceSettingsOpen: panelState?.settingsOpen === true,
-      voicePreviewEnabled,
-      voiceInactivityMinutes,
-    });
+    mount();
     if (resume && !disposed) void current.session.start({ pushToTalk });
     globalThis.document?.getElementById('gev-voice-provider')?.focus();
     return true;
@@ -97,22 +89,6 @@ export function createProviderCommands(options, { bind, factories, storage }) {
     if (disposed) return false;
     return current.session.sendText(text);
   };
-
-  const unavailablePanelView = () => ({
-    ok: false,
-    changed: false,
-    reason: disposed ? 'disposed' : 'unavailable',
-    error: disposed
-      ? 'Voice controls are no longer available.'
-      : 'Voice panel views are not available.',
-    view: null,
-    panelOpen: false,
-    settingsOpen: false,
-    previewVisible: false,
-    previewEnabled: false,
-    frontPanelId: null,
-    ...(!disposed ? current?.getVoicePanelOrderState?.() : {}),
-  });
 
   const api = {
     // The shared action surface is independent of an active voice connection.
@@ -141,61 +117,6 @@ export function createProviderCommands(options, { bind, factories, storage }) {
     sendTextCommand,
     sendText: sendTextCommand,
     notifyMapEvent: (event) => !disposed && current.session.sendMapEvent(event),
-    setVoiceSettingsOpen: (open) =>
-      !disposed && current?.setVoiceSettingsOpen?.(open),
-    selectVoicePanelView: (view) =>
-      !disposed && typeof current?.selectVoicePanelView === 'function'
-        ? current.selectVoicePanelView(view)
-        : unavailablePanelView(),
-    closeVoicePanelView: (view) =>
-      !disposed && typeof current?.closeVoicePanelView === 'function'
-        ? current.closeVoicePanelView(view)
-        : unavailablePanelView(),
-    deferVoiceSettingsUntilCockpitExit: () =>
-      !disposed && current?.deferVoiceSettingsUntilCockpitExit?.(),
-    cancelDeferredVoiceSettings: () =>
-      !disposed && current?.cancelDeferredVoiceSettings?.(),
-    getVoicePanelOrderState: () =>
-      !disposed ? current?.getVoicePanelOrderState?.() : unavailablePanelView(),
-    getVoicePreviewEnabled: () =>
-      !disposed ? current?.getVoicePreviewEnabled?.() : undefined,
-    setVoicePreviewEnabled: (enabled) => {
-      if (!disposed && current?.setVoicePreviewEnabled)
-        return current.setVoicePreviewEnabled(enabled);
-      return {
-        ok: false,
-        enabled: !disposed
-          ? (current?.getVoicePreviewEnabled?.() ?? null)
-          : null,
-        changed: false,
-        reason: disposed ? 'disposed' : 'preview-unavailable',
-        error: disposed
-          ? 'Voice Preview controls are no longer available.'
-          : 'Voice Preview is not available.',
-      };
-    },
-    setVoicePanelOrder: (panelId, position) => {
-      if (!disposed && current?.setVoicePanelOrder)
-        return current.setVoicePanelOrder(panelId, position);
-      return {
-        ok: false,
-        panelId,
-        position,
-        reason: disposed ? 'disposed' : 'unavailable',
-        error: disposed
-          ? 'Voice controls are no longer available.'
-          : 'Voice panel ordering is not available.',
-        frontPanelId: null,
-        settingsOpen: false,
-        previewVisible: false,
-        previewEnabled: false,
-        ...current?.getVoicePanelOrderState?.(),
-      };
-    },
-    setVoiceInactivityMinutes: (minutes) =>
-      !disposed && current?.setVoiceInactivityMinutes?.(minutes),
-    getVoiceInactivityMinutes: () =>
-      !disposed ? current?.getVoiceInactivityMinutes?.() : undefined,
   };
   // Existing diagnostic and controller accessors continue to reflect the active provider.
   const facade = new Proxy(api, {
@@ -205,11 +126,7 @@ export function createProviderCommands(options, { bind, factories, storage }) {
       return typeof value === 'function' ? value.bind(current) : value;
     },
   });
-  function mount({
-    voiceSettingsOpen = false,
-    voicePreviewEnabled,
-    voiceInactivityMinutes,
-  } = {}) {
+  function mount() {
     voiceEnabled = false;
     const generation = ++mountGeneration;
     current = bind({
@@ -224,10 +141,6 @@ export function createProviderCommands(options, { bind, factories, storage }) {
         if (!disposed && generation === mountGeneration)
           handleSessionEvent(event);
       },
-      storage: stored(),
-      voiceSettingsOpen,
-      voicePreviewEnabled,
-      voiceInactivityMinutes,
       createSession: factories[provider],
     });
     window.__gevVoiceCommands = facade;

@@ -85,11 +85,6 @@ export class GevRealtimeController extends RealtimeFacade {
     this.onSessionEvent = onSessionEvent;
     this.backend = backend;
     this.lifetimeSignal = signal;
-    this._microphoneRequested = false;
-    this._localOutputActive = false;
-    this._localOutputStream = null;
-    this._localOutputAudioEl = null;
-    this._localOutputWasMuted = null;
 
     this.lifetimeAbort = () => this.stop({ removeUi: true });
     signal?.addEventListener('abort', this.lifetimeAbort, { once: true });
@@ -144,6 +139,10 @@ export class GevRealtimeController extends RealtimeFacade {
         setStatus: (...args) => this.setStatus(...args),
         debugLog: (...args) => this.debugLog(...args),
         stop: (...args) => this.stop(...args),
+        readVoiceResumeSettings: () => ({
+          pushToTalk: Boolean(this.pushToTalkMode),
+        }),
+        resumeVoice: (settings) => this.start(settings),
       },
     });
     this._input = new RealtimeInput({
@@ -152,8 +151,6 @@ export class GevRealtimeController extends RealtimeFacade {
       readStatus: () => this.status,
       operations: {
         isActive: (...args) => this.isActive(...args),
-        noteVoiceActivity: (activity) =>
-          this.emitSessionEvent({ type: 'activity', ...activity }),
         setStatus: (...args) => this.setStatus(...args),
         start: (...args) => this.start(...args),
         pauseRadioForVoice: (...args) => this.pauseRadioForVoice(...args),
@@ -162,8 +159,6 @@ export class GevRealtimeController extends RealtimeFacade {
         releasePointerHold: () => this.pointer?.releaseHold(),
         beginPointerTurn: (at) => this.beginPointerTurn(at),
         mayClaimSpeaker: () => this._radio.mayVoiceClaimSpeaker(),
-        requestMicrophoneEnabled: (enabled) =>
-          this.setMicrophoneEnabled(enabled),
       },
     });
 
@@ -197,7 +192,6 @@ export class GevRealtimeController extends RealtimeFacade {
         isRadioHandoffReserved: (...args) =>
           this.isRadioHandoffReserved(...args),
         isSessionEnding: (...args) => this.isSessionEnding(...args),
-        readLocalOutputActive: () => this._localOutputActive,
         pauseRadioForVoice: (...args) => this.pauseRadioForVoice(...args),
         recordUsage: (...args) => this.recordUsage(...args),
         recordTranscriptionUsage: (...args) =>
@@ -215,6 +209,10 @@ export class GevRealtimeController extends RealtimeFacade {
         startPendingRadioHandoff: (...args) =>
           this.startPendingRadioHandoff(...args),
         stop: (...args) => this.stop(...args),
+        readVoiceResumeSettings: () => ({
+          pushToTalk: Boolean(this.pushToTalkMode),
+        }),
+        resumeVoice: (settings) => this.start(settings),
       },
     });
     // Progress narration: spoken lines go out of band through the turns
@@ -241,6 +239,10 @@ export class GevRealtimeController extends RealtimeFacade {
         isActive: (...args) => this.isActive(...args),
         pauseRadioForVoice: (...args) => this.pauseRadioForVoice(...args),
         stop: (...args) => this.stop(...args),
+        readVoiceResumeSettings: () => ({
+          pushToTalk: Boolean(this.pushToTalkMode),
+        }),
+        resumeVoice: (settings) => this.start(settings),
         syncCostUi: (...args) => this.syncCostUi(...args),
         setStatus: (...args) => this.setStatus(...args),
         debugLog: (...args) => this.debugLog(...args),
@@ -371,13 +373,6 @@ export class GevRealtimeController extends RealtimeFacade {
     // releases its own resources instead of promoting them onto a stopped
     // controller (H7).
     this._connection.invalidate();
-    // Retire local-output ownership before media teardown. A late finally
-    // block from an acknowledgement must never re-enable a stopped track.
-    this._localOutputActive = false;
-    this._localOutputStream = null;
-    this._localOutputAudioEl = null;
-    this._localOutputWasMuted = null;
-    this._microphoneRequested = false;
     if (removeUi)
       this.lifetimeSignal?.removeEventListener('abort', this.lifetimeAbort);
     this.cancelPushToTalkHold();
@@ -445,55 +440,6 @@ export class GevRealtimeController extends RealtimeFacade {
     } catch {
       /* Observers cannot interrupt voice. */
     }
-  }
-
-  claimLocalProviderCommand() {
-    return this._turns.claimLocalProviderCommand();
-  }
-
-  releaseLocalProviderCommand() {
-    return this._turns.releaseLocalProviderCommand();
-  }
-
-  beginLocalOutput() {
-    if (this._localOutputActive || !this._radio.mayVoiceClaimSpeaker())
-      return false;
-    this._localOutputActive = true;
-    this._localOutputStream = this.stream || null;
-    this._localOutputAudioEl = this.audioEl || null;
-    this._input.setMicrophoneEnabled(false);
-    this._localOutputWasMuted = this.audioEl?.muted ?? null;
-    if (this.audioEl) this.audioEl.muted = true;
-    this.setVoiceSpeaker('ai');
-    return true;
-  }
-
-  endLocalOutput() {
-    if (!this._localOutputActive) return false;
-    const outputStream = this._localOutputStream;
-    const outputAudioEl = this._localOutputAudioEl;
-    this._localOutputActive = false;
-    this._localOutputStream = null;
-    this._localOutputAudioEl = null;
-    if (
-      outputAudioEl &&
-      this.audioEl === outputAudioEl &&
-      this._localOutputWasMuted !== null
-    )
-      outputAudioEl.muted = this._localOutputWasMuted;
-    this._localOutputWasMuted = null;
-    if (outputStream && this.stream === outputStream && this.isActive())
-      this._input.setMicrophoneEnabled(this._microphoneRequested);
-    this.setVoiceSpeaker('idle', { keepVisualizerSpeaker: true });
-    return true;
-  }
-
-  /** Keep the user's requested mic state separate from its physical track. */
-  setMicrophoneEnabled(enabled) {
-    this._microphoneRequested = Boolean(enabled);
-    this._input.setMicrophoneEnabled(
-      this._microphoneRequested && !this._localOutputActive,
-    );
   }
 
   setStatus(status, detail) {

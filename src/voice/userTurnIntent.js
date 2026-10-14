@@ -15,8 +15,7 @@ export function createVoiceUserTurnTracker({
   const responseState = (id) => {
     const record = responses.get(id);
     if (!record) return { status: 'untracked', userTurn: undefined };
-    if (record !== current || record.retired)
-      return { status: 'stale', userTurn: undefined };
+    if (record !== current) return { status: 'stale', userTurn: undefined };
     if (record.inputKind === 'speech' && !record.text)
       return { status: 'pending-speech', userTurn: undefined };
     return { status: 'ready', userTurn: record.token };
@@ -52,7 +51,6 @@ export function createVoiceUserTurnTracker({
       text,
       inputKind,
       token,
-      retired: false,
       isCurrent: () => current === record,
     };
     records.set(token, record);
@@ -76,15 +74,6 @@ export function createVoiceUserTurnTracker({
       settleWaiters({ status: 'stale', userTurn: undefined });
       current = null;
       responses.clear();
-    },
-    retireCurrentResponse() {
-      const record = current;
-      settleWaiters({ status: 'stale', userTurn: undefined });
-      current = null;
-      responses.clear();
-      if (!record) return false;
-      record.retired = true;
-      return true;
     },
     rejectPendingResponse(requestId) {
       if (!requestId) return false;
@@ -129,7 +118,6 @@ export function createVoiceUserTurnTracker({
     bindResponse(id) {
       if (!id || overflow) return null;
       const record = pending.shift()?.record;
-      if (record?.retired) return 'retired';
       if (!record) return 'untracked';
       if (record !== current) return 'stale';
       responses.set(id, record);

@@ -173,33 +173,6 @@ test('interruption preserves old pending slots but revokes their authority befor
   );
 });
 
-test('retired provider turns stay correlated when a fresh turn starts before the old response', () => {
-  const tracker = createVoiceUserTurnTracker();
-  tracker.speechStarted('provider-input');
-  tracker.transcript('provider-input', 'switch to Gemini');
-  tracker.commitSpeech('provider-input');
-  assert.equal(tracker.retireCurrentResponse(), true);
-
-  tracker.speechStarted('fresh-input');
-  tracker.transcript('fresh-input', 'what is in view?');
-  tracker.commitSpeech('fresh-input');
-  assert.equal(tracker.bindResponse('late-provider-response'), 'retired');
-  assert.equal(tracker.bindResponse('fresh-response'), 'current');
-  assert.equal(
-    readVoiceUserTurnText(tracker.forResponse('fresh-response')),
-    'what is in view?',
-  );
-});
-
-test('an uncorrelated response error cannot remove a retired automatic-response slot', () => {
-  const tracker = createVoiceUserTurnTracker();
-  tracker.speechStarted('provider-input');
-  tracker.commitSpeech('provider-input');
-  assert.equal(tracker.retireCurrentResponse(), true);
-  assert.equal(tracker.rejectPendingResponse('unrelated-error'), false);
-  assert.equal(tracker.bindResponse('late-provider-response'), 'retired');
-});
-
 test('failed response requests, empty input, and reservation overflow fail closed until a new lifetime', () => {
   const tracker = createVoiceUserTurnTracker();
   tracker.text('switch to Gemini');

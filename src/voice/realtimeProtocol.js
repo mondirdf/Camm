@@ -104,35 +104,6 @@ export function responseInstructionForToolResult(result) {
     return 'Say exactly once in your normal voice: “I can’t switch voice providers directly. Hover over the Voice panel and use the provider dropdown.” Do not add any action claim or call another tool.';
   if (result?.voiceIntentUnverified === true)
     return 'Say exactly once in your normal voice: “I couldn’t verify that voice command. Please try again.” Do not claim an action ran or call another tool.';
-  if (result?.requiresClarification === true && result?.panelId === 'settings')
-    return 'Ask: “Do you mean Voice Settings—the voice provider and preferences?” Open nothing yet. An affirmative answer, including “yes, provider settings”, means set_panel_open with voice-settings and open true. On no or cancel, call set_panel_open with settings and open false; do not open a different panel.';
-  if (result?.action === 'set_voice_panel_order')
-    return result.ok
-      ? 'Confirm only the returned selected voice view once, not front/back stacking. Selecting Preview never enables it; preserve any disabled state.'
-      : 'Explain the returned refusal briefly. No view changed; do not enable a disabled preview or open another panel.';
-  if (result?.action === 'set_voice_preview_enabled')
-    return result.ok
-      ? 'Confirm the returned Voice Preview enabled/disabled preference aloud, including any persistence warning. Enabled does not mean a card is currently visible. Tab selection is separate; voice stays unchanged.'
-      : 'Explain the returned preview-setting refusal briefly. Do not stop voice or claim the preference changed.';
-  if (result?.requiresCockpitExit === true) {
-    return result.pending
-      ? 'Tell the user: “Voice Settings is available from the main view. Would you like me to exit Cockpit and open it for you?” Do not mention the expiry time, do not claim that the panel opened, and do not exit Cockpit without an affirmative reply. If the user agrees, call control_cockpit with action exit; the pending request will open Voice Settings after Cockpit exits, so do not call set_panel_open again. If the user declines, call set_panel_open with voice-settings and open false to cancel the pending request.'
-      : 'Tell the user to exit Cockpit and ask again to open Voice Settings. Do not claim that the panel opened, do not exit Cockpit automatically, and do not retry with another panel.';
-  }
-  if (
-    result?.action === 'set_panel_open' &&
-    ['voice-preview', 'voice-settings'].includes(result.panelId)
-  ) {
-    if (
-      result.ok &&
-      result.panelId === 'voice-settings' &&
-      result.open === true
-    )
-      return 'For this action, say exactly: “Voice Settings is selected and open.” If another action completed in the same response, also confirm that action briefly. Do not add Preview, captions, preference, visibility, enablement or stacking commentary.';
-    return result.ok
-      ? 'Confirm the returned voice view selection or closure. Closing an inactive view does not close the selected view. Selecting Preview does not enable it or guarantee visible captions.'
-      : 'Explain the returned refusal; do not claim a voice view opened or enable Preview. Do not exit Cockpit without permission.';
-  }
   if (result?.action === 'control_radio' && result.radioPlaybackSuppressed) {
     if (result.audioState === 'paused') {
       return 'Briefly confirm the completed Radio action, then say that Radio remains paused as requested. Do not say the request was cancelled or that Radio is playing.';

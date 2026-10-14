@@ -1,9 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  providerManualConfirmationSay,
-  providerSwitchSay,
-  providerUnavailableSay,
+  VOICE_PROVIDER_GUIDANCE,
   readVoiceProviderRequest,
   readVoiceProviderRequestText,
 } from './providerIntent.js';
@@ -60,10 +58,10 @@ test('explicit first-party provider requests accept bounded standalone command f
 
 test('segmented speech guidance never repeats an unsettled provider target', () => {
   assert.equal(
-    providerManualConfirmationSay(),
+    VOICE_PROVIDER_GUIDANCE,
     'I can’t switch voice providers directly. Hover over the Voice panel and use the provider dropdown.',
   );
-  assert.doesNotMatch(providerManualConfirmationSay(), /Gemini|OpenAI/);
+  assert.doesNotMatch(VOICE_PROVIDER_GUIDANCE, /Gemini|OpenAI/);
 });
 
 test('forged, quoted, negated, conditional and compound text never authorizes provider mutation', () => {
@@ -117,12 +115,4 @@ test('current first-party intent is retired by new input, interruption and final
     retire(tracker);
     assert.equal(readVoiceProviderRequest(token), undefined);
   }
-});
-
-test('provider acknowledgement text is fixed and code-authored', () => {
-  const guidance =
-    'I can’t switch voice providers directly. Hover over the Voice panel and use the provider dropdown.';
-  assert.equal(providerSwitchSay('openai'), guidance);
-  assert.equal(providerSwitchSay('gemini'), guidance);
-  assert.equal(providerUnavailableSay('gemini'), guidance);
 });
