@@ -1,5 +1,16 @@
 # Changelog
 
+- Add Houston traffic cameras from Houston TranStar as a CCTV pack. The camera
+  list is one keyless JSON request to
+  `traffic.houstontranstar.org/data/layers/cctvSnapshots_json.js`; frames are
+  stills synthesized from each numeric camera id on `www.houstontranstar.org`,
+  so a catalog field cannot steer the proxy off-host. Cameras without a
+  snapshot id, and cameras outside Greater Houston, are dropped. By default
+  the 250 cameras nearest downtown, Uptown, the Medical Center, IAH and
+  Galveston load. `CCTV_HOUSTON_ENABLED=0` turns the pack off and
+  `CCTV_HOUSTON_MAX_SOURCES` changes the cap. The catalog-wide ceiling is
+  unchanged; extra cameras share it round-robin with the other packs.
+
 - GBFS v3 station names use English translations when available, then the first
   usable translation or short name. Empty or malformed names no longer appear as
   `[object Object]` or interrupt station loading; legacy string names remain
