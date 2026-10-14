@@ -14,6 +14,7 @@ import { RecordingControls } from './recordingControls.js';
 import { readShellElements } from './shellElements.js';
 import { CockpitCoordinator } from './cockpitCoordinator.js';
 import { ContextControls } from './context.js';
+import { FlightRoster } from './flightRoster.js';
 import { CctvControls } from './cctv.js';
 import { StreetLevelControls } from './streetLevelControls.js';
 import { RadioControls } from './radio.js';
@@ -790,6 +791,11 @@ export class StyleManager extends ShellFacade {
 
   _initGlobalContextPanel() {
     const { radioLayer, militaryInstallationsLayer } = this.services;
+    this._flightRoster = new FlightRoster({
+      root: this._contextFlightsView,
+      layer: this.services.flightsLayer,
+      viewer: this.viewer,
+    });
     this._contextControls = new ContextControls({
       elements: {
         _globalContextPanel: document.getElementById('global-context-panel'),
@@ -987,6 +993,8 @@ export class StyleManager extends ShellFacade {
         _cctvCoverageBtn: this._cctvCoverageBtn,
         _cctvEnableBtn: this._cctvEnableBtn,
         _cctvFocusBtn: this._cctvFocusBtn,
+        _cctvBackBtn: this._cctvBackBtn,
+        _cctvForwardBtn: this._cctvForwardBtn,
         _cctvFrame: this._cctvFrame,
         _cctvFrameWrap: this._cctvFrameWrap,
         _cctvVideo: this._cctvVideo,
@@ -1011,6 +1019,8 @@ export class StyleManager extends ShellFacade {
           this._dataManager?.setLayerParams('cctv', params, options),
         toggleEnabled: (...args) => this._toggleCctvEnabled(...args),
         runExplicitFocus: (...args) => this._runExplicitCctvFocus(...args),
+        runExplicitNavigation: (...args) =>
+          this._runExplicitNavigation(...args),
         setPanelCollapsed: (...args) => this.setPanelCollapsed(...args),
         showToast: (message) => this._showToast(message),
         syncViewport: () => this._syncCctvPanelViewport(),
@@ -1025,7 +1035,7 @@ export class StyleManager extends ShellFacade {
    * @param {boolean} [forceState] - Explicit on/off. Omit to toggle.
    * @returns {Promise<boolean>} True if the layer is now in the requested state.
    */
-  async _toggleCctvEnabled(forceState) {
+  async _toggleCctvEnabled(forceState, { suppressAutoFocus = false } = {}) {
     const { cctvLayer } = this.services;
     if (this._disposed) return false;
     if (!this._dataManager || !this._dataManager.layers?.has('cctv')) {
@@ -1044,6 +1054,7 @@ export class StyleManager extends ShellFacade {
         cockpitActive: !!this.cockpitView?.active,
       }),
       shouldFocus: () =>
+        !suppressAutoFocus &&
         !this._disposed &&
         this._dataManager.isEnabled('cctv') &&
         !this._cctvControls?.getState()?.activeCameraId,
@@ -1599,6 +1610,7 @@ export class StyleManager extends ShellFacade {
     // re-enable a mode's entry layer and republish `_contextMode` while the
     // rest of teardown is tearing those very layers down.
     this._contextControls.stop();
+    this._flightRoster?.destroy();
     this._navigation.destroy();
     // Close camera-entry seams synchronously. Context restoration may await
     // layer work, so leaving these listeners attached until afterward lets a
