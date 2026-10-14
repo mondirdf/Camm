@@ -248,6 +248,12 @@ export const DATA_CREDITS = [
       'distributed by Statens vegvesen',
   },
   {
+    key: 'houston-cctv',
+    html:
+      'CCTV cameras &amp; frames (Houston): ' +
+      '<a href="https://traffic.houstontranstar.org/cctv/transtar/" target="_blank" rel="noopener">Houston TranStar</a>',
+  },
+  {
     key: 'gbfs',
     html: 'Bikeshare availability: GBFS operator feeds (e.g. Austin BCycle)',
   },
