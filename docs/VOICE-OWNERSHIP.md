@@ -39,7 +39,15 @@ short control taps and text entry remain native; a claimed hold while the assist
 open-mic. Every accepted or refused tool call receives its terminal output once.
 New typed input supersedes old intent. Radio waits for the spoken confirmation and
 verified muted playback. A live cost meter stays bound to its negotiated model,
-even when the next-session preference changes.
+even when the next-session preference changes. Clear standalone first-party
+provider requests remain ordinary provider turns, so the active OpenAI or Gemini
+model says in its normal voice, “I can’t switch voice providers directly. Hover
+over the Voice panel and use the provider dropdown.” The model has no provider
+switching tool, and an authenticated provider request blocks attempted app
+actions. It never changes or saves provider state, starts or stops a provider,
+or remounts a session. Ambiguous, quoted, negated, conditional and compound text
+remains ordinary conversation. Manual selection is the only provider switching
+path.
 
 Run the unit suite and both live recorded-audio modes against a configured local
 server:

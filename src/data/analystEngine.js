@@ -1056,6 +1056,9 @@ export function createAnalystEngine(providers) {
         layersQueried,
         records: totals,
         scope: scopeNote,
+        ...(scope.kind === 'region' && resolvedScope?.source
+          ? { scopeSource: resolvedScope.source }
+          : {}),
         ...(rememberedScope?.note ? { note: rememberedScope.note } : {}),
         ...(queriedSnapshots.length
           ? { feedProvenance: feedProvenanceEnvelope(queriedSnapshots) }

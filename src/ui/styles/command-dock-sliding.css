@@ -80,21 +80,14 @@
 }
 
 #command-dock .dock-popover-content::after {
-  /* content: ''; */
+  content: '';
   position: absolute;
-  bottom: -0.34rem;
-  left: 1.65rem;
-  width: 0.6rem;
-  height: 0.6rem;
-  background: rgba(8, 20, 30, 0.96);
-  border-right: 1px solid rgba(123, 189, 211, 0.28);
-  border-bottom: 1px solid rgba(123, 189, 211, 0.28);
-  transform: rotate(45deg);
-}
-
-#command-dock #control-panel .dock-popover-content::after {
-  right: 1.65rem;
-  left: auto;
+  right: 0;
+  bottom: -1.3rem;
+  left: 0;
+  height: 1.3rem;
+  background: transparent;
+  pointer-events: auto;
 }
 
 #command-dock .dock-popover-content .location-city-row,

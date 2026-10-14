@@ -778,6 +778,185 @@ test('Cyber voice telemetry renders a live scan scope without replacing audio ow
     cyberStyles,
     /prefers-reduced-motion: reduce[\s\S]*?gev-voice-visualizer::after[\s\S]*?animation: none/,
   );
+  assert.match(
+    cyberStyles,
+    /#gev-voice-button:focus-visible\s*\{[\s\S]*?outline:\s*2px solid var\(--cyber-red-bright\) !important;[\s\S]*?outline-offset:\s*-3px;/,
+  );
+  assert.match(
+    cyberStyles,
+    /#gev-voice-button:focus-visible[\s\S]*?\.gev-mic-orbit\s*\{[\s\S]*?border-color:\s*var\(--cyber-red-bright\);[\s\S]*?background:\s*rgba\(196, 84, 84, 0\.24\);/,
+  );
+});
+
+test('Voice Preview and Settings share one frame with persistent accessible tabs', () => {
+  const control = readFileSync(
+    new URL('../voice/control.js', import.meta.url),
+    'utf8',
+  );
+  const voiceStyles = readFileSync(
+    new URL('./styles/voice-cost.css', import.meta.url),
+    'utf8',
+  );
+  const dockStyles = readFileSync(
+    new URL('./styles/command-dock-trays.css', import.meta.url),
+    'utf8',
+  );
+  const cardStyles = readFileSync(
+    new URL('./styles/voice-card.css', import.meta.url),
+    'utf8',
+  );
+  const surfaces = readFileSync(
+    new URL('./styles/panel-surfaces.css', import.meta.url),
+    'utf8',
+  );
+  assert.match(control, /providerField\.setAttribute\('data-panel-surface'/);
+  assert.match(control, /data-panel-header/);
+  assert.match(control, /data-panel-body/);
+  assert.match(control, /data-panel-popup/);
+  assert.match(control, /panel-surface-control/);
+  assert.match(
+    control,
+    /id="gev-voice-settings-button"[^>]*aria-expanded="false"[^>]*aria-controls="gev-voice-panel"/,
+  );
+  assert.match(
+    control,
+    /id="gev-voice-settings-button"[^>]*aria-label="Voice settings"/,
+  );
+  assert.match(control, /gev-voice-settings-icon[^>]*>settings<\/span>/);
+  assert.match(
+    control,
+    /class="gev-voice-inactivity-fieldset"[^>]*aria-describedby="gev-voice-inactivity-note gev-voice-provider-limit-note"/,
+  );
+  assert.match(
+    control,
+    /type="radio" name="gev-voice-inactivity" value="custom"/,
+  );
+  assert.match(
+    control,
+    /id="gev-voice-inactivity-custom" type="range" min="1" max="60"/,
+  );
+  assert.match(
+    control,
+    /id="gev-voice-inactivity-note"[^>]*aria-live="polite"/,
+  );
+  assert.doesNotMatch(voiceStyles, /data-ui-theme='cyber'|cockpit-mode/);
+  assert.match(
+    voiceStyles,
+    /\.gev-voice-inactivity-custom\[hidden\]\s*\{\s*display:\s*none;/,
+  );
+  assert.match(
+    voiceStyles,
+    /--voice-panel-pinned-lift:\s*min\([\s\S]*?100dvh - 22rem/,
+    'short pinned layouts reserve enough height for the scrollable panel',
+  );
+  assert.match(
+    dockStyles,
+    /@media \(max-width: 420px\)[\s\S]*?\.gev-voice-error-tray\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?left:\s*50%;[\s\S]*?width:\s*min\(24rem, calc\(100vw - 1\.5rem\)\);/,
+    'the standalone error tray stays inside narrow viewports',
+  );
+  assert.match(
+    cyberStyles,
+    /@media \(max-width: 620px\)[\s\S]*?--dock-side-compact:\s*3\.25rem;[\s\S]*?--dock-presets-open:\s*min\(25rem, calc\(100vw - 1\.5rem\)\);/,
+    'Cyber narrows its collapsed wings and expanded presets tray on phones',
+  );
+  assert.match(
+    voiceStyles,
+    /\.gev-voice-inactivity-chip input:focus-visible \+ span\s*\{[\s\S]*?outline:\s*2px solid var\(--text-primary\);/,
+  );
+  assert.match(control, /id="gev-voice-panel"[^>]*data-panel-popup/);
+  assert.doesNotMatch(
+    control,
+    /id="gev-voice-settings-panel"[^>]*data-panel-popup/,
+  );
+  assert.match(control, /role="tablist" aria-label="Voice panel"/);
+  assert.match(
+    control,
+    /id="gev-voice-preview-tab"[^>]*role="tab"[^>]*aria-selected="true"[^>]*tabindex="0"/,
+  );
+  assert.match(
+    control,
+    /id="gev-voice-preview-tab"[^>]*aria-label="Voice Preview"[^>]*title="Voice Preview"[^>]*>[\s\S]*?gev-voice-panel-tab-icon[^>]*>visibility<\/span>/,
+  );
+  assert.match(
+    control,
+    /id="gev-voice-settings-tab"[^>]*role="tab"[^>]*aria-selected="false"[^>]*tabindex="-1"/,
+  );
+  assert.match(
+    control,
+    /id="gev-voice-settings-tab"[^>]*aria-label="Voice Settings"[^>]*title="Voice Settings"[^>]*>[\s\S]*?gev-voice-panel-tab-icon[^>]*>settings<\/span>/,
+  );
+  assert.ok(
+    control.indexOf('id="gev-voice-preview-tab"') <
+      control.indexOf('id="gev-voice-settings-tab"'),
+  );
+  assert.match(cardStyles, /\.gev-voice-panel-header\s*\{\s*flex:\s*0 0 auto;/);
+  assert.match(
+    cardStyles,
+    /\.gev-voice-panel-content\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;/,
+  );
+  assert.match(
+    cardStyles,
+    /\.gev-voice-panel-tab\[aria-selected='true'\]\s*\{[\s\S]*?border-color:\s*currentColor;/,
+  );
+  assert.match(
+    cardStyles,
+    /\.gev-voice-panel-tab\s*\{[\s\S]*?width:\s*2rem;[\s\S]*?padding:\s*0;/,
+  );
+  assert.match(
+    cardStyles,
+    /\.gev-voice-panel-tab-icon\s*\{[\s\S]*?font-size:\s*1\.05rem;/,
+  );
+  assert.match(
+    cardStyles,
+    /@media \(max-width: 900px\)[\s\S]*?\.gev-voice-panel\s*\{[\s\S]*?width:\s*min\(22rem, calc\(100vw - 6rem\)\);/,
+    'the compact popup reserves room for the off-center dock anchor',
+  );
+  assert.match(
+    cardStyles,
+    /@media \(max-width: 420px\)[\s\S]*?\.gev-voice-panel-header > \.panel-surface-title\s*\{[\s\S]*?display:\s*none;/,
+    'small screens prioritize the two tabs and common Close over the duplicate title',
+  );
+  assert.match(
+    cardStyles,
+    /:root\[data-ui-theme='cyber'\] #gev-voice-control \.gev-voice-panel\s*\{[\s\S]*?--voice-card-surface:\s*var\(--cyber-panel-surface\);/,
+  );
+  assert.doesNotMatch(voiceStyles, /data-voice-settings-front/);
+  assert.doesNotMatch(
+    cyberStyles,
+    /\.gev-voice-settings-panel\[data-panel-popup\]/,
+  );
+  assert.match(
+    surfaces,
+    /body:is\(\.ui-clean-view, \.recording-mode\)[\s\S]*?\[data-panel-surface\]/,
+  );
+  assert.match(
+    surfaces,
+    /\.panel-surface-control:focus-visible\s*\{[\s\S]*?outline:\s*2px solid var\(--text-primary\);[\s\S]*?outline-offset:\s*-3px;/,
+  );
+  assert.match(
+    voiceStyles,
+    /\.gev-voice-provider-field \.gev-voice-provider-header\s*\{[\s\S]*?display:\s*none;/,
+  );
+  assert.match(
+    cyberStyles,
+    /:root\[data-ui-theme='cyber'\][\s\S]*?\.gev-voice-provider-field[\s\S]*?\.gev-voice-provider-header\s*\{\s*display:\s*flex;/,
+  );
+  assert.match(
+    voiceStyles,
+    /#command-dock > #gev-voice-control\s*\{\s*z-index:\s*8;/,
+  );
+  assert.match(
+    voiceStyles,
+    /#gev-voice-control\[data-status='listening'\][\s\S]*?\.gev-voice-kicker\s*\{\s*display:\s*none;/,
+  );
+  assert.match(
+    voiceStyles,
+    /#command-dock:has\(#gev-voice-control:hover\)[\s\S]*?opacity:\s*1;[\s\S]*?transform:\s*translate\(-50%, 0\);/,
+  );
+  assert.match(
+    voiceStyles,
+    /prefers-reduced-motion:\s*reduce[\s\S]*?#command-dock > \.gev-voice-provider-field[\s\S]*?transition:\s*none;/,
+  );
 });
 
 test('Cyber Cockpit Display uses the released briefing lane instead of the legacy viewport cap', () => {

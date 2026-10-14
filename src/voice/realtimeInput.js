@@ -55,6 +55,7 @@ export class RealtimeInput {
     if (this.shortcutKeyDownHandler) return;
     this.shortcutKeyDownHandler = (event) => {
       if (!shouldHandlePushToTalkKeyDown(event)) return;
+      this.noteVoiceActivity?.({ kind: 'push-to-talk', active: true });
       if (event.repeat) {
         if (this.spaceKeyHeld && !this.pushToTalkHoldPreservesNative)
           event.preventDefault();
@@ -116,7 +117,7 @@ export class RealtimeInput {
           if (mayInterrupt) this.bargeIn?.();
           this.beginPointerTurn?.('keydown');
           this.ui.root.dataset.pushToTalk = 'held';
-          this.setMicrophoneEnabled(true);
+          this.requestMicrophone(true);
           if (this.status === 'listening')
             this.setStatus('listening', 'Release Space to send');
         } else {
@@ -129,6 +130,7 @@ export class RealtimeInput {
     };
     this.shortcutKeyUpHandler = (event) => {
       if (!isPushToTalkKey(event)) return;
+      this.noteVoiceActivity?.({ kind: 'push-to-talk', active: false });
       const wasHoldingSpace = this.spaceKeyHeld;
       const preservedNativeActivation = this.pushToTalkHoldPreservesNative;
       this.spaceKeyHeld = false;
@@ -145,6 +147,7 @@ export class RealtimeInput {
       this.resetPushToTalkGesture();
     };
     this.shortcutBlurHandler = () => {
+      this.noteVoiceActivity?.({ kind: 'push-to-talk', active: false });
       this.spaceKeyHeld = false;
       this.cancelPushToTalkHold();
       this.releasePushToTalkKey();
@@ -192,7 +195,7 @@ export class RealtimeInput {
     this.pushToTalkKeyHeld = false;
     delete this.ui.root.dataset.pushToTalk;
     if (!this.pushToTalkMode) return;
-    this.setMicrophoneEnabled(false);
+    this.requestMicrophone(false);
     if (this.status === 'listening')
       this.setStatus('listening', 'Hold Space to talk');
     else this.updateVoiceButtonLabel();
@@ -209,6 +212,13 @@ export class RealtimeInput {
     this.stream?.getAudioTracks?.().forEach((track) => {
       track.enabled = Boolean(enabled);
     });
+  }
+
+  /** Route requests through a session owner when it has a separate gate. */
+  requestMicrophone(enabled) {
+    if (typeof this.requestMicrophoneEnabled === 'function')
+      this.requestMicrophoneEnabled(enabled);
+    else this.setMicrophoneEnabled(enabled);
   }
 
   /**
@@ -381,6 +391,11 @@ export class RealtimeInput {
       keepVisualizerSpeaker,
     );
     this.ui.root.dataset.speaker = nextSpeaker;
+    this.noteVoiceActivity?.({
+      kind: 'speech-playback',
+      active: nextSpeaker !== 'idle',
+      speaker: nextSpeaker,
+    });
     if (shouldPauseRadioForVoice({ speaker: nextSpeaker }))
       this.pauseRadioForVoice();
   }

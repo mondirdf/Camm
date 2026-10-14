@@ -111,7 +111,36 @@ export const ACTION_DESCRIPTIONS = {
     },
   },
   set_panel_open: {
-    description: 'Open or close a GEV UI panel/dropdown.',
+    description:
+      'Open or close GEV panels. Voice targets select views; Street View uses street-level-panel. For generic settings, call panelId=settings, then ask its question. Cockpit defers Voice Settings and refuses Preview.',
+    $position: 1,
+  },
+  set_voice_panel_order: {
+    description:
+      'Legacy view selection: front selects named voice view, back the other. Never enables Preview.',
+    $position: 1,
+  },
+  set_voice_preview_enabled: {
+    description:
+      'Set saved Voice Preview captions/results preference; separate from tab selection. Voice is unchanged.',
+    $position: 1,
+  },
+  set_voice_inactivity_timeout: {
+    description:
+      'Set browser-local voice inactivity timeout: whole minutes 1–60 (presets 3/5/10/15), or 0=None (no inactivity stop).',
+    $position: 1,
+    parameters: {
+      properties: {
+        minutes: {
+          description: 'Whole minutes; 0 disables.',
+          $position: 1,
+        },
+      },
+    },
+  },
+  set_street_level_options: {
+    description:
+      'Change bounded Street View/Street Level options: imagery provider, panorama filter, age window, or viewer fit mode. Use set_layer_visibility separately to turn the layer on or off.',
     $position: 1,
   },
   set_context_mode: {
@@ -314,13 +343,13 @@ export const ACTION_DESCRIPTIONS = {
   },
   control_radio: {
     description:
-      'Control Internet Radio playback without moving the map. Use select whenever the request includes a station category, name, country, coordinates, or nearby place—even when the user says play. Use play only for an unqualified "turn on/start the radio" request so the current or nearest station begins. Enable only reveals the Radio layer/markers without audio. Also supports disable, resume, pause, stop, next/previous, volume, and status.',
+      'Internet Radio; never moves the camera. Play starts the current or nearest station. "Play news near Austin" → select category=news locationId=austin; "play US news" → select category=news country=US; "Radio volume 30" → volume. Other actions match their names.',
     $position: 1,
     parameters: {
       properties: {
         action: {
           description:
-            'Use select for any request qualified by category, station, country, coordinates, or place. Use play only for an unqualified turn on/start/listen request. Use enable only when the user explicitly asks to show or enable the Radio layer or its markers without requesting audio.',
+            'Select for any category/station/country/coordinates/place, even if asked to play. Play only for unqualified turn on/start/listen; enable only for explicit show/enable Radio layer/marker requests without audio.',
           $position: 2,
         },
         volumePct: {
@@ -329,8 +358,7 @@ export const ACTION_DESCRIPTIONS = {
           $position: 3,
         },
         category: {
-          description:
-            'Station category for select/next/previous. When the user requests playback with a category, action must be select, not play.',
+          description: 'Station category for select/next/previous.',
           $position: 2,
         },
         locationId: {
@@ -511,13 +539,13 @@ export const ACTION_DESCRIPTIONS = {
   },
   move_camera: {
     description:
-      'Direct the camera like a drone operator: orbit the current view target, pan, tilt, or rotate — one bounded nudge (mode=once) or continuous motion until stopped (mode=continuous). Continuous motion also stops on any manual camera input or when a navigation tool runs. Say the RESULTING state when confirming ("Orbiting slowly").',
+      'rotate_globe spins Earth in the requested visible direction while preserving framing; rotate turns the camera in place; orbit circles the ground target; pan translates; tilt changes pitch. once nudges; continuous runs until stop, manual input or navigation. Confirm the resulting state.',
     $position: 1,
     parameters: {
       properties: {
         direction: {
           description:
-            'Required except for orbit (defaults right/clockwise) and stop.',
+            'Required for pan/tilt/rotate; orbit/rotate_globe default right.',
           $position: 2,
         },
         mode: {

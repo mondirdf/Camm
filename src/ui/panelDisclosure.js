@@ -105,6 +105,7 @@ export function createHoverDisclosure({
   let openTimer = null;
   let closeTimer = null;
   let lastWheelTime = 0;
+  let lastPointer = null;
   let disclosureFocusTimer = null;
   let focusRequest = 0;
 
@@ -159,12 +160,39 @@ export function createHoverDisclosure({
     }
   };
 
+  const pointerInPopoverTransit = () => {
+    if (!lastPointer || panelEl.classList.contains('collapsed')) return false;
+    const popover = panelEl.querySelector?.('.dock-popover-content');
+    if (
+      !popover?.getBoundingClientRect ||
+      typeof panelEl.getBoundingClientRect !== 'function'
+    )
+      return false;
+    const panelRect = panelEl.getBoundingClientRect();
+    const popoverRect = popover.getBoundingClientRect();
+    const gapTop = Math.min(popoverRect.bottom, panelRect.top);
+    const gapBottom = Math.max(popoverRect.bottom, panelRect.top);
+    if (gapBottom - gapTop <= 0) return false;
+    const left = Math.min(popoverRect.left, panelRect.left);
+    const right = Math.max(popoverRect.right, panelRect.right);
+    return (
+      lastPointer.x >= left &&
+      lastPointer.x <= right &&
+      lastPointer.y >= gapTop &&
+      lastPointer.y <= gapBottom
+    );
+  };
+
   const scheduleClose = () => {
     clearClose();
     closeTimer = window.setTimeout(() => {
       closeTimer = null;
       if (destroyed || !isActive()) return;
       if (panelEl.matches(':hover') || keyboardFocusInside()) return;
+      if (pointerInPopoverTransit()) {
+        scheduleClose();
+        return;
+      }
       if (panelEl.classList.contains('dock-pinned')) return;
       if (panelEl.classList.contains('collapsed')) return;
       onChange(true);
@@ -181,6 +209,14 @@ export function createHoverDisclosure({
     { passive: true },
   );
 
+  listen(document, 'pointermove', (event) => {
+    const pointerType = event.pointerType || 'mouse';
+    if (pointerType !== 'mouse' && pointerType !== 'pen') return;
+    if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY))
+      return;
+    lastPointer = { x: event.clientX, y: event.clientY };
+  });
+
   listen(panelEl, 'click', (event) => {
     if (event.target.closest('.panel-collapse-btn, .dock-tray-toggle')) return;
     clearOpen();
@@ -193,6 +229,7 @@ export function createHoverDisclosure({
   listen(panelEl, 'pointerenter', (event) => {
     const pointerType = event.pointerType || 'mouse';
     if (pointerType !== 'mouse' && pointerType !== 'pen') return;
+    lastPointer = null;
     clearClose();
     if (panelEl.classList.contains('collapsed')) {
       scheduleOpen();

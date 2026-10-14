@@ -1745,8 +1745,9 @@ async function runBehaviorLayer() {
       'behavior: analyst follow-up re-filters the remembered set',
       `count=${r?.count} followUp=${r?.coverage?.followUp}`,
     );
-    // A marine region resolves from the bundled Natural Earth pack in the page,
-    // without the slower geocode fallback.
+    // A marine region resolves from the bundled Natural Earth pack in the page.
+    // Keep whole-query latency as a diagnostic, but do not use it as a resolver
+    // timer: record collection and filtering also run inside this call.
     const gulfStarted = Date.now();
     r = await run('analyst_query', {
       layers: ['flights'],
@@ -1757,9 +1758,9 @@ async function runBehaviorLayer() {
     report(
       r?.ok === true &&
         String(r?.coverage?.scope || '').includes('Gulf of Mexico') &&
-        gulfMs < 3000,
+        r?.coverage?.scopeSource === 'natural-earth',
       'behavior: analyst resolves the Gulf of Mexico from the bundled pack',
-      `scope=${r?.coverage?.scope} ms=${gulfMs} err=${r?.error || ''}`,
+      `scope=${r?.coverage?.scope} source=${r?.coverage?.scopeSource || '(none)'} wholeQueryMs=${gulfMs} err=${r?.error || ''}`,
     );
 
     // (5) zoom_to_globe is ABSOLUTE full-earth (>12,000 km band)
@@ -2168,9 +2169,9 @@ async function runBehaviorLayer() {
     );
 
     // (9c-2) With Contacts up, an aircraft radius query must carry the panel's
-    // own numbers. Field case: analyst said 8 for a 250 km window the panel had
-    // at 42 — both honest (analyst counts loaded records, the flights layer
-    // reloads by viewport), and the operator saw two answers to one question.
+    // own snapshot and keep its flattened fields consistent. The live feed can
+    // refresh between the query response and the later diagnostic read below,
+    // so equality with that later snapshot is not part of the contract.
     r = await run('analyst_query', {
       layers: ['flights'],
       scope: { kind: 'radius', km: 250 },
@@ -2185,16 +2186,30 @@ async function runBehaviorLayer() {
       return cohort ? cohort.count : null;
     });
     const windowBlock = r?.contactsWindow || null;
+    const aircraftCount = Number.isFinite(windowBlock?.aircraft)
+      ? windowBlock.aircraft
+      : null;
+    const usesContactsWindowEngine = r?.window?.engine === 'contacts-window';
+    const responseIsConsistent = usesContactsWindowEngine
+      ? r.count === r.window.flights &&
+        r.window.aircraft === r.window.flights + r.window.military &&
+        r.window.centeredOn === windowBlock?.centeredOn
+      : r?.contactsWindowCount === aircraftCount &&
+        r?.contactsWindowSubject === windowBlock?.centeredOn;
     report(
       Boolean(windowBlock) &&
-        windowBlock.flights === awarenessFlights &&
+        (Number.isFinite(windowBlock.flights) ||
+          windowBlock.flights === 'unknown') &&
+        (Number.isFinite(windowBlock.military) ||
+          windowBlock.military === 'unknown') &&
+        responseIsConsistent &&
         windowBlock.radiusKm === 250 &&
         typeof windowBlock.centeredOn === 'string' &&
         /loads by viewport/.test(r?.coverage?.note || '') &&
         // Contract rule 3: the count names its own scope.
         /^within 250 km of /.test(r?.scopeLabel || ''),
       'behavior: analyst_query carries the Contacts panel counts and says what it measured',
-      `contactsWindow=${JSON.stringify(windowBlock)} awarenessFlights=${awarenessFlights} analystCount=${r?.count} scopeLabel="${r?.scopeLabel}"`,
+      `contactsWindow=${JSON.stringify(windowBlock)} queryWindow=${JSON.stringify(r?.window || null)} flattenedCount=${r?.contactsWindowCount} awarenessFlightsAfter=${awarenessFlights} analystCount=${r?.count} scopeLabel="${r?.scopeLabel}"`,
     );
 
     // (9d-2) enter + targetLayer must land on that layer or refuse by name.
