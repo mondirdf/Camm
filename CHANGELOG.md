@@ -1,5 +1,11 @@
 # Changelog
 
+- Clamp `viewer.resolutionScale` to the WebGL context's maximum texture size
+  (`Cesium.ContextLimits.maximumTextureSize`) on high-resolution (2K/4K) and fullscreen
+  displays, preventing GlobeDepth and framebuffer texture allocation crashes.
+  Preserves requested scaling when the viewport shrinks. Thanks to
+  [xiehuanyi](https://github.com/xiehuanyi) (#940) for separating requested and effective scale.
+
 - Snow flakes sway within a fixed range instead of drifting sideways faster the
   longer the app runs; the Wind setting still scales the sway.
 
