@@ -36,10 +36,33 @@ test('the complete Realtime tool payload pins the manifest-generated layer relea
     // consolidated tool wording (each policy stated once); model-facing tools
     // omit top-level anyOf (OpenAI rejects it). Contacts list routing preserves
     // requested radius and center authority in descriptions only.
-    // Street Level and GNSS extend the manifest; tracked and analyst aircraft describe broadcasts.
+    // Street Level and GNSS extend the manifest; tracked and analyst aircraft
+    // describe broadcasts; show_street_level (fly, map, source, photo) is the
+    // only change on top of main.
+    SHOW_STREET_LEVEL_PAYLOAD_DIGEST,
+  );
+  // Every shipped tool is byte-identical to the previous release: the new
+  // tool is the whole difference, so a later edit cannot hide in a re-pin.
+  const shipped = createHash('sha256')
+    .update(
+      JSON.stringify(
+        stable(
+          GEV_REALTIME_TOOLS.filter(
+            (tool) =>
+              !['set_cyber_sonar', 'show_street_level'].includes(tool.name),
+          ),
+        ),
+      ),
+    )
+    .digest('hex');
+  assert.equal(
+    shipped,
     '9398815a573ab29ecc3ce527f6e1a2ad883804e7696e0444aebb11f973700d4b',
   );
 });
+
+const SHOW_STREET_LEVEL_PAYLOAD_DIGEST =
+  '5f0bba7ddd89fb01630ad24b79eb9670d3148d553abb0ed5b9f747ddac04ae3d';
 
 test('descriptions customize wording without changing immutable shared arguments', () => {
   const descriptions = {
@@ -95,7 +118,10 @@ test('metadata cannot add tools, fields, types or enum values', () => {
 
 test('all legacy action arguments are byte-identical after removing the deliberate additions', () => {
   const legacy = structuredClone(GEV_ACTION_SCHEMAS).filter(
-    (tool) => !['next_satellite_pass', 'set_cyber_sonar'].includes(tool.name),
+    (tool) =>
+      !['next_satellite_pass', 'set_cyber_sonar', 'show_street_level'].includes(
+        tool.name,
+      ),
   );
   // Layer enums are generated from the voice layer manifest and pinned by
   // layerManifest.test.mjs; the two shipped right-rail panels are additive.
