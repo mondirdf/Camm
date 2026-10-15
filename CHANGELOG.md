@@ -144,6 +144,18 @@
 
 ## [Unreleased]
 
+- Add an Airports layer for Norway under Infrastructure. It bundles the 89
+  aerodromes OpenStreetMap maps in Norway with an ICAO code (every Avinor
+  airport, plus Torp, Rygge, Ørland, Stord, Svalbard, Jan Mayen and the
+  airfields), drawn with their outlines and runway surfaces, and cards with
+  ICAO · IATA · operator and civil/military type. New Bodø Airport, under
+  construction, is drawn in amber: site, 2,750 m runway and terminal, with
+  Avinor's planned 2029 opening. `scripts/build-airports-norway.py` rebuilds
+  or `--verify`s the file from a pinned Geofabrik extract. Voice and the
+  analyst know the layer as `local-airports`; its share-link token is `4`.
+- Keep later satellites when a TLE catalog entry is missing an orbital line.
+  The parser skips the incomplete set and resumes at the next complete named
+  set, instead of losing the rest of the group (#906).
 - Flights and Military Flights highlight emergency transponder broadcasts in
   fleet billboards, 3D models and Cockpit contacts. Colors update when a status
   starts or clears. Emergency squawks outrank ADS-B priority statuses; GEV
