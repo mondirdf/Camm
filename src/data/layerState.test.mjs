@@ -202,8 +202,11 @@ function encode(state) {
 
 test('production registry is exact, canonical, and rejects incomplete contracts', async () => {
   assert.equal(validateLayerStateRegistry(), true);
-  assert.equal(REGISTERED_LAYER_IDS.length, 29);
-  assert.equal(new Set(REGISTERED_LAYER_IDS).size, 29);
+  // 29 published layers plus weather-aurora. LEGACY_LAYER_STATE_TOKENS below
+  // is deliberately NOT extended: it is the frozen record of tokens already in
+  // the wild, and a new layer earns a fresh reservation instead.
+  assert.equal(REGISTERED_LAYER_IDS.length, 30);
+  assert.equal(new Set(REGISTERED_LAYER_IDS).size, 30);
   assert.ok(REGISTERED_LAYER_IDS.includes('transit'));
   assert.deepEqual(REGISTERED_LAYER_IDS, [...REGISTERED_LAYER_IDS].sort());
   assert.deepEqual(LEGACY_LAYER_STATE_TOKENS, {
@@ -242,19 +245,22 @@ test('production registry is exact, canonical, and rejects incomplete contracts'
   for (const [id, token] of Object.entries(LEGACY_LAYER_STATE_TOKENS)) {
     assert.equal(LAYER_STATE_TOKEN_RESERVATIONS[id], token);
   }
-  assert.equal(nextLayerStateToken(), '3');
+  // Was '3' before this layer. weather-aurora took the digit the allocator
+  // was handing out, so the next contributor gets '4' — 0, 1 and 2 are
+  // already published.
+  assert.equal(nextLayerStateToken(), '4');
   assert.equal(
     nextLayerStateToken({
       ...LAYER_STATE_TOKEN_RESERVATIONS,
-      alpha: '3',
-      bravo: '4',
+      alpha: '4',
+      bravo: '5',
     }),
-    '5',
+    '6',
   );
   const digitsExhausted = {
     ...LAYER_STATE_TOKEN_RESERVATIONS,
     ...Object.fromEntries(
-      [...'3456789'].map((digit) => [`prior-${digit}`, digit]),
+      [...'456789'].map((digit) => [`prior-${digit}`, digit]),
     ),
   };
   assert.equal(nextLayerStateToken(digitsExhausted), '00');
@@ -305,11 +311,11 @@ test('production registry is exact, canonical, and rejects incomplete contracts'
     true,
   );
   assert.equal(
-    validateLayerStateAllocations(LAYER_STATE_TOKEN_RESERVATIONS, {
-      ...LAYER_STATE_TOKEN_RESERVATIONS,
-      future: '3',
-      next: '4',
-    }),
+    validateLayerStateAllocations(
+      LAYER_STATE_TOKEN_RESERVATIONS,
+      // 0 through 3 are now taken, so a conforming pair starts at 4.
+      { ...LAYER_STATE_TOKEN_RESERVATIONS, future: '4', next: '5' },
+    ),
     true,
   );
   assert.throws(
@@ -318,7 +324,7 @@ test('production registry is exact, canonical, and rejects incomplete contracts'
         ...LAYER_STATE_TOKEN_RESERVATIONS,
         future: '00',
       }),
-    /next free token 3/,
+    /next free token 4/,
   );
   const beforeLastDigit = { ...digitsExhausted };
   delete beforeLastDigit['prior-9'];
@@ -341,10 +347,10 @@ test('production registry is exact, canonical, and rejects incomplete contracts'
   assert.throws(
     () =>
       validateLayerStateAllocations(
-        { ...LAYER_STATE_TOKEN_RESERVATIONS, merged: '3' },
-        { ...LAYER_STATE_TOKEN_RESERVATIONS, merged: '3', competing: '3' },
+        { ...LAYER_STATE_TOKEN_RESERVATIONS, merged: '4' },
+        { ...LAYER_STATE_TOKEN_RESERVATIONS, merged: '4', competing: '4' },
       ),
-    /next free token 4/,
+    /next free token 5/,
   );
   assert.throws(
     () => validateLayerStateAllocations({ future: '00' }, { future: '01' }),
@@ -2636,6 +2642,26 @@ test('the recent-imagery split is share-link only: never stored locally, and a s
   assert.equal(
     parseStoredLayerState(previous).options['recent-imagery'].split,
     50,
+  );
+});
+
+test('the aurora holds digit 3 and round-trips with its options', () => {
+  assert.equal(
+    LAYER_STATE_REGISTRY.find(({ id }) => id === 'weather-aurora').token,
+    '3',
+  );
+  const decoded = decodeLayerStateParams(
+    new URLSearchParams('v=2&l=3.k&lo=3.o.l'),
+  );
+  assert.deepEqual(decoded.enabledLayerIds, ['weather-aurora', 'wind']);
+  assert.deepEqual(decoded.options['weather-aurora'], { opacity: 'light' });
+  assert.deepEqual(
+    decodeLayerStateParams(new URLSearchParams(encode(decoded))),
+    decoded,
+  );
+  assert.deepEqual(
+    decodeLayerStateParams(new URLSearchParams('v=2&l=3')).enabledLayerIds,
+    ['weather-aurora'],
   );
 });
 
