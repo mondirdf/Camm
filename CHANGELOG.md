@@ -26,6 +26,9 @@
 
 - Cancelled catalog queries refuse execution when their signal is already aborted.
 
+- Keep unknown GBFS availability counts neutral instead of turning null or empty
+  values into zero bikes.
+
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
 
