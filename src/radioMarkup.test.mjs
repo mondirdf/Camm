@@ -384,5 +384,5 @@ test('successful explicit user playback hands the speaker from voice to Radio', 
   assert.match(radioBindings, /togglePlayback\(\{ origin: 'user' \}\)/);
   assert.match(radioBindings, /cycleStation\(direction, \{[\s\S]*?origin: 'user'/);
   assert.match(radioBindings, /commitTuningStation\(station\.id, \{ origin: 'user' \}\)/);
-  assert.match(realtime, /event\.origin === 'user' &&\s*event\.action === 'play' &&\s*this\.isActive\(\)[\s\S]*?this\.stop\(\{ preserveRadioPlayback: true \}\)/);
+  assert.match(realtime, /else if \(event\.origin === 'user'\)[\s\S]*?event\.action === 'play' && this\.isActive\(\)[\s\S]*?this\.stop\(\{ preserveRadioPlayback: true \}\)/);
 });

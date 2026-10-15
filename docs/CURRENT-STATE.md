@@ -5335,3 +5335,13 @@ datacenters, dams and the Nepal locator retain that shared credit while displaye
 
 Military fragments stitch by source identity. Different mapped parcels merge only
 when their footprints touch or contain one another, never across a seam tolerance gap.
+
+### Gemini Live provider integration
+
+Standalone voice supports OpenAI and Gemini; embedded hosts default to OpenAI and opt into Gemini through `voice.supportedProviders`. The provider dropdown uses the existing microphone control and result card. Manual selection reconnects an active session in its prior input mode; push-to-talk stays muted until a fresh Space hold. Voice that was off stays off.
+
+Gemini uses a separate server-side `GEMINI_API_KEY` and one-session ephemeral credentials from `/api/gemini/token`. Device-rate microphone capture is resampled to 16 kHz; playback uses a separate 24 kHz context. Microphone permission precedes token minting. Input capture identities, bounded control queues, retired replies and pending tool actions are released or invalidated on interruption, Stop, replacement and teardown. `goAway` stops new turns and drains the current reply until completion or its supplied deadline, then requires an explicit restart.
+
+Both providers use the shared action schemas, tool-result policy, pointer context and Radio ownership. A voice-started Radio handoff can resume the prior voice mode once within 30 seconds when that same Radio attempt is paused or disabled. Ordinary Stop, manual Radio changes, provider replacement and teardown revoke the lease.
+
+Clear standalone provider-switch requests receive the fixed spoken dropdown guidance; neither provider can change the selected provider through a tool. Ambiguous, quoted, negated, conditional and compound text remains ordinary conversation. The separate API-key setup entry remains available; the core provider does not add a Voice Settings panel or voice actions for opening key setup.

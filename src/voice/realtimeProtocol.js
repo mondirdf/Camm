@@ -100,6 +100,10 @@ export function hasStructuredViewIdentity(result) {
 }
 
 export function responseInstructionForToolResult(result) {
+  if (result?.providerRequestBlocked === true)
+    return 'Say exactly once in your normal voice: “I can’t switch voice providers directly. Hover over the Voice panel and use the provider dropdown.” Do not add any action claim or call another tool.';
+  if (result?.voiceIntentUnverified === true)
+    return 'Say exactly once in your normal voice: “I couldn’t verify that voice command. Please try again.” Do not claim an action ran or call another tool.';
   if (result?.action === 'control_radio' && result.radioPlaybackSuppressed) {
     if (result.audioState === 'paused') {
       return 'Briefly confirm the completed Radio action, then say that Radio remains paused as requested. Do not say the request was cancelled or that Radio is playing.';

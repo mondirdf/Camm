@@ -1,4 +1,9 @@
 import {
+  providerRequestGuidanceResult,
+  readVoiceProviderRequest,
+  VOICE_PROVIDER_GUIDANCE,
+} from './providerIntent.js';
+import {
   layerSnapshot,
   layerSnapshots,
   feedProvenanceEnvelope,
@@ -706,6 +711,21 @@ export function createGevActionRunner({
       return { ok: true, action: 'set_panel_open', panelId, open };
     }
 
+    if (name === 'set_voice_provider') {
+      const provider = String(args.provider || '')
+        .trim()
+        .toLowerCase();
+      return {
+        ok: false,
+        action: name,
+        provider: provider || null,
+        changed: false,
+        pending: false,
+        error: VOICE_PROVIDER_GUIDANCE,
+        say: VOICE_PROVIDER_GUIDANCE,
+      };
+    }
+
     if (name === 'set_context_mode') {
       if (!styleManager?.setContextMode) {
         return {
@@ -1199,6 +1219,8 @@ export function createGevActionRunner({
         cancelled: true,
         error: 'Voice ended.',
       };
+    if (readVoiceProviderRequest(callerOptions.userTurn))
+      return providerRequestGuidanceResult(name);
     const epoch = conversation;
     const runOptions = {
       ...callerOptions,

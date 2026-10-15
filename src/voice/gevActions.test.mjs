@@ -3885,3 +3885,71 @@ test('analyst-only lookup distinguishes duplicate names and uses canonical aircr
   assert.equal(plane.ok, true);
   assert.equal(plane.latitude, 36, 'canonical ID resolves the current position, not old coordinates');
 });
+
+import { createVoiceUserTurnTracker } from './userTurnIntent.js';
+
+test('voice provider selection is refused because only the manual dropdown has authority', async () => {
+  const calls = [];
+  const { viewer, styleManager } = createVoiceNavigationHarness();
+  const runner = createActionRunner({
+    viewer,
+    styleManager,
+    readVoiceCommands: () => ({
+      provider: 'openai',
+      requestProviderChange(provider) {
+        calls.push(provider);
+        return {
+          ok: true,
+          changed: true,
+          pending: true,
+          previousProvider: 'openai',
+        };
+      },
+    }),
+  });
+
+  assert.deepEqual(await runner('set_voice_provider', { provider: 'gemini' }), {
+    ok: false,
+    action: 'set_voice_provider',
+    provider: 'gemini',
+    changed: false,
+    pending: false,
+    error:
+      'I can’t switch voice providers directly. Hover over the Voice panel and use the provider dropdown.',
+    say: 'I can’t switch voice providers directly. Hover over the Voice panel and use the provider dropdown.',
+  });
+  assert.deepEqual(calls, []);
+});
+
+test('an authenticated provider request blocks attempted app actions', async () => {
+  const applied = [];
+  const { viewer, styleManager } = createVoiceNavigationHarness();
+  styleManager.setPanelCollapsed = (...args) => applied.push(args);
+  const runner = createActionRunner({ viewer, styleManager });
+  const tracker = createVoiceUserTurnTracker();
+  tracker.text('Switch to Gemini');
+  tracker.expectResponse();
+  tracker.bindResponse('provider-request');
+  const blocked = await runner('set_panel_open', { panelId: 'radio-panel', open: true }, { userTurn: tracker.forResponse('provider-request') });
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.providerRequestBlocked, true);
+  assert.equal(blocked.changed, false);
+  assert.match(blocked.say, /use the provider dropdown/);
+  assert.deepEqual(applied, []);
+  tracker.text('Open Radio');
+  tracker.expectResponse();
+  tracker.bindResponse('ordinary-request');
+  assert.equal((await runner('set_panel_open', { panelId: 'radio-panel', open: true }, { userTurn: tracker.forResponse('ordinary-request') })).ok, true);
+  assert.deepEqual(applied, [['radio-panel', false, { explicit: true }]]);
+});
+
+test('removed voice panel routes reject before changing panel state', async () => {
+  const { viewer, styleManager } = createVoiceNavigationHarness();
+  const changed = [];
+  styleManager.setPanelCollapsed = (...args) => changed.push(args);
+  const runner = createActionRunner({ viewer, styleManager });
+  for (const panelId of ['voice-settings', 'voice-preview', 'provider-settings']) {
+    await assert.rejects(runner('set_panel_open', { panelId, open: true }), /Unknown panel/);
+  }
+  assert.deepEqual(changed, []);
+});

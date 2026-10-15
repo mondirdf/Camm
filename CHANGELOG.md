@@ -172,6 +172,14 @@
   Mapillary only and hide while GOOGLE STREET VIEW is lit; its globe marker
   is a Google-blue view cone.
 
+- Add Gemini Live as an alternative voice provider using a separate server-side
+  API key and short-lived browser credentials. It shares the existing microphone,
+  push-to-talk, result card, map tools and Radio handoff with OpenAI. The manual
+  provider dropdown reconnects active voice in its prior input mode; spoken or
+  typed provider-switch requests give fixed dropdown guidance. Gemini owns
+  device-rate capture, 16 kHz resampling, 24 kHz playback, bounded queues,
+  interruption cleanup and explicit restart after its connection expires.
+
 - Add an experimental ChatGPT/Codex OAuth option for cloud voice in Provider
   Settings. API-key voice remains the default. Local sign-in can start from
   the auth button and reports completion, failure, timeout, or expired

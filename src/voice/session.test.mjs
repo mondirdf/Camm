@@ -8,6 +8,7 @@ import {
 import { createVoiceSession } from './session.js';
 import { realtimeSessionEvent } from './realtimeEvents.js';
 import { createVoiceCommands } from './sessionCommands.js';
+import { VoiceCardControls } from './voiceCard.js';
 
 function deferred() {
   let resolve;
@@ -432,4 +433,41 @@ test('a late rejection cannot settle a newer turn card', async () => {
     false,
   );
   f.session.destroy();
+});
+
+test('a supplied adapter retains cost controls without a provider selector', () => {
+  const previous = globalThis.window;
+  globalThis.window = new EventTarget();
+  const button = new EventTarget();
+  button.setAttribute = () => {};
+  const ui = {
+    root: { dataset: {}, remove() {} },
+    button,
+    status: {},
+    detail: {},
+    providerField: { hidden: true, remove() {} },
+    providerSelect: new EventTarget(),
+    tierButton: { hidden: true },
+    costValue: { hidden: true },
+  };
+  let controls;
+  try {
+    controls = createVoiceCommands({
+      runner: async () => ({ ok: true }),
+      createControl: () => ui,
+      createSession: () => ({
+        capabilities: { costControls: true, pushToTalk: true },
+        start() {},
+        stop() {},
+        sendText() {},
+        sendMapEvent() {},
+      }),
+    });
+    assert.equal(ui.providerField.hidden, true);
+    assert.equal(ui.tierButton.hidden, false);
+    assert.equal(ui.costValue.hidden, false);
+  } finally {
+    controls?.session.destroy();
+    globalThis.window = previous;
+  }
 });

@@ -182,3 +182,33 @@ test('the benchmark still rejects an empty track_entity although the model-facin
     [],
   );
 });
+
+import { createGeminiLiveConfig } from '../../server/providers/gemini/config.js';
+test('Gemini uses the shared core catalog without follow-up actions', () => {
+  const setup = createGeminiLiveConfig();
+  const declarations = setup.tools.flatMap(
+    (tool) => tool.functionDeclarations || [],
+  );
+  assert.deepEqual(
+    declarations.map((tool) => tool.name),
+    GEV_REALTIME_TOOLS.map((tool) => tool.name),
+  );
+  for (const name of [
+    'set_voice_provider',
+    'set_voice_inactivity_timeout',
+    'set_voice_panel_order',
+    'set_voice_preview_enabled',
+    'set_street_level_options',
+  ]) {
+    assert.equal(
+      declarations.some((tool) => tool.name === name),
+      false,
+      name,
+    );
+  }
+  const camera = GEV_ACTION_SCHEMAS.find((tool) => tool.name === 'move_camera');
+  assert.equal(
+    camera.parameters.properties.motion.enum.includes('rotate_globe'),
+    false,
+  );
+});

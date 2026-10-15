@@ -2,8 +2,9 @@
  * Protocol-independent voice lifetime and action dispatch.
  * An adapter receives { emit, runAction, signal } and supplies start, stop,
  * sendText and sendMapEvent. It owns its microphone/connection and wire messages.
- * Events: state, transcript, action-call, progress, action-result, interruption,
- * completion, turn-metrics.
+ * Events: state, stop, transcript, action-call, progress, action-result,
+ * interruption, completion, turn-metrics. A stop event also
+ * covers teardown that preserves the adapter’s displayed status.
  */
 export function createVoiceSession({ createAdapter, runner, signal }) {
   if (typeof createAdapter !== 'function' || typeof runner !== 'function')
@@ -169,8 +170,14 @@ export function createVoiceSession({ createAdapter, runner, signal }) {
       try {
         adapter.stop(options);
       } finally {
-        if (!options.preserveStatus)
-          emit({ type: 'state', state: 'idle', detail: 'Voice off' });
+        if (options.preserveStatus)
+          emit({ type: 'stop', preserveStatus: true });
+        else
+          emit({
+            type: 'state',
+            state: 'idle',
+            detail: 'Voice off',
+          });
       }
     },
     sendText: (text) => !disposed && adapter.sendText(text),
