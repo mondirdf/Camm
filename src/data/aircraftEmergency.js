@@ -12,6 +12,7 @@
  * crews pass through 7x00 codes while dialling. Highlighting follows the latest
  * broadcast, which does not confirm an incident or its resolution.
  */
+import { msg } from '../i18n/index.js';
 
 /** @constant {string} Tint for aircraft broadcasting an emergency (not a priority). */
 export const EMERGENCY_TINT_CSS = '#FF4444';
@@ -19,12 +20,12 @@ export const EMERGENCY_TINT_CSS = '#FF4444';
 const SQUAWK_KINDS = { 7500: 'unlawful', 7600: 'nordo', 7700: 'general' };
 
 const KINDS = {
-  general: { label: 'General emergency', severity: 'emergency' },
-  unlawful: { label: 'Unlawful interference', severity: 'emergency' },
-  nordo: { label: 'Radio failure', severity: 'emergency' },
-  downed: { label: 'Downed aircraft', severity: 'emergency' },
-  minfuel: { label: 'Minimum fuel', severity: 'priority' },
-  lifeguard: { label: 'Lifeguard (medical priority)', severity: 'priority' },
+  general: { label: msg('General emergency'), severity: 'emergency' },
+  unlawful: { label: msg('Unlawful interference'), severity: 'emergency' },
+  nordo: { label: msg('Radio failure'), severity: 'emergency' },
+  downed: { label: msg('Downed aircraft'), severity: 'emergency' },
+  minfuel: { label: msg('Minimum fuel'), severity: 'priority' },
+  lifeguard: { label: msg('Lifeguard (medical priority)'), severity: 'priority' },
 };
 
 /**

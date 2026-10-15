@@ -6,6 +6,7 @@ import {
   loadGeoFile,
 } from '../data/geoFileImport.js';
 import { flyToDataSource } from './flyToDataSource.js';
+import { formatNumber, t, tn } from '../i18n/index.js';
 
 // One color per file, in import order, from the whiteboard palette.
 const COLORS = ['#39d0ff', '#ffb547', '#5dff9f', '#ff6b6b', '#8be9ff'];
@@ -78,7 +79,7 @@ export function initGeoFileImport({
           } catch {
             if (!destroyed)
               setHint(
-                'Ground heights could not be refreshed. Try the file again when the map has loaded.',
+                t('Ground heights could not be refreshed. Try the file again when the map has loaded.'),
               );
           } finally {
             groundQueued = false;
@@ -139,15 +140,33 @@ export function initGeoFileImport({
         name.className = 'geo-import-name';
         // textContent, never markup: the name comes from the file system.
         name.textContent = item.name;
-        name.title = `${item.name} — ${item.format.toUpperCase()}, ${item.entityCount.toLocaleString()} map object${item.entityCount === 1 ? '' : 's'}${item.ownStyles ? ', drawn with its own styles' : ''}`;
+        const objects = tn(
+          item.entityCount,
+          '{count} map object',
+          '{count} map objects',
+          { count: formatNumber(item.entityCount) },
+        );
+        name.title = item.ownStyles
+          ? t('{name} — {format}, {objects}, drawn with its own styles', {
+              name: item.name,
+              format: item.format.toUpperCase(),
+              objects,
+            })
+          : t('{name} — {format}, {objects}', {
+              name: item.name,
+              format: item.format.toUpperCase(),
+              objects,
+            });
         const actions = [
           [
             item.visible ? 'visibility' : 'visibility_off',
-            item.visible ? `Hide ${item.name}` : `Show ${item.name}`,
+            item.visible
+              ? t('Hide {name}', { name: item.name })
+              : t('Show {name}', { name: item.name }),
             'toggle',
           ],
-          ['my_location', `Fly to ${item.name}`, 'fly'],
-          ['close', `Remove ${item.name}`, 'remove'],
+          ['my_location', t('Fly to {name}', { name: item.name }), 'fly'],
+          ['close', t('Remove {name}', { name: item.name }), 'remove'],
         ].map(([icon, label, action]) => {
           const btn = doc.createElement('button');
           btn.type = 'button';
@@ -264,11 +283,13 @@ export function initGeoFileImport({
         outcomes.push({
           name: fileName,
           ok: false,
-          error: `At most ${MAX_IMPORTED_FILES} files at once — remove one first.`,
+          error: t('At most {max} files at once — remove one first.', {
+            max: MAX_IMPORTED_FILES,
+          }),
         });
         continue;
       }
-      setHint(`Reading ${fileName}…`);
+      setHint(t('Reading {file}…', { file: fileName }));
       const color = COLORS[colorAt % COLORS.length];
       let loaded;
       try {
@@ -447,16 +468,26 @@ export function summarize(outcomes) {
   const failed = outcomes.filter((o) => !o.ok);
   const added = outcomes.length - failed.length;
   const parts = [];
-  if (added) parts.push(`Added ${added} file${added === 1 ? '' : 's'}.`);
-  if (failed.length === 1) parts.push(`${failed[0].name}: ${failed[0].error}`);
+  if (added)
+    parts.push(
+      tn(added, 'Added {count} file.', 'Added {count} files.', {
+        count: formatNumber(added),
+      }),
+    );
+  if (failed.length === 1)
+    parts.push(t('{name}: {error}', failed[0]));
   else if (failed.length > 1)
     parts.push(
-      `${failed.length} files could not be added (${failed[0].name}: ${failed[0].error})`,
+      t('{count} files could not be added ({name}: {error})', {
+        count: formatNumber(failed.length),
+        name: failed[0].name,
+        error: failed[0].error,
+      }),
     );
   const stripped = outcomes.reduce(
     (n, o) => n + (o.ok ? o.removed || 0 : 0),
     0,
   );
-  if (added && stripped) parts.push('Some KML content was left out.');
+  if (added && stripped) parts.push(t('Some KML content was left out.'));
   return parts.join(' ');
 }

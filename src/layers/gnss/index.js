@@ -8,6 +8,7 @@ import {
   gnssProvenance,
   pruneGnssObservations,
 } from './records.js';
+import { t } from '../../i18n/index.js';
 export * from './records.js';
 export { createAdsbGnssSource } from './source.js';
 
@@ -388,7 +389,13 @@ export function createGnssIntegrityLayer({
           count: _cells.filter((cell) => cell.level === level).length,
           ...(index === 0
             ? {
-                blurb: `Low-accuracy score = 100 × max(0, bad − 1) / total: one aircraft is discounted, so this is not the raw share. Cells need ${GNSS_MIN_AIRCRAFT} aircraft over ${provenance.window.minutes} minutes. Navigation-integrity anomalies are not a detection of jamming or spoofing.`,
+                blurb: t(
+                  'Low-accuracy score = 100 × max(0, bad − 1) / total: one aircraft is discounted, so this is not the raw share. Cells need {minAircraft} aircraft over {minutes} minutes. Navigation-integrity anomalies are not a detection of jamming or spoofing.',
+                  {
+                    minAircraft: GNSS_MIN_AIRCRAFT,
+                    minutes: provenance.window.minutes,
+                  },
+                ),
               }
             : {}),
         })),
