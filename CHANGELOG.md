@@ -26,6 +26,9 @@
 
 - Cancelled catalog queries refuse execution when their signal is already aborted.
 
+- Exclude aircraft without a reported altitude from requested altitude bands;
+  unfiltered aircraft queries still retain them.
+
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
 
