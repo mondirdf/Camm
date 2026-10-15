@@ -1,5 +1,13 @@
 # Changelog
 
+- Add Encarnación's public Sambódromo / Costanera camera to the existing CCTV
+  layer. Selecting its approximate venue marker opens the Municipality's original
+  RTSP.me player inside the camera panel, with an official-page link. The player
+  unloads when hidden or deselected. No frames, coverage frustum or calibrated
+  facing are claimed for this external player. `CCTV_ENCARNACION_ENABLED=0`
+  disables the pack. Optional Google tiles-token discovery returns JSON `null`
+  without a startup 404 when no token provider is configured.
+
 - A Radio Browser mirror answering 204, 205 or 304, or a status outside
   200–599, no longer crashes the local dev/preview server. Null-body statuses
   get an empty body; anything else that cannot become a response fails that
