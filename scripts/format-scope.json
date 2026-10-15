@@ -1022,5 +1022,8 @@
   "src/sources/gbfsStations.test.mjs",
   "scripts/qa-gbfs-names.mjs",
   "src/ui/flyToDataSource.js",
-  "src/ui/flyToDataSource.test.mjs"
+  "src/ui/flyToDataSource.test.mjs",
+  "scripts/build-argentina-admin.mjs",
+  "scripts/lib/admin-pack-geometry.mjs",
+  "src/data/argentinaAdmin.test.mjs"
 ]
