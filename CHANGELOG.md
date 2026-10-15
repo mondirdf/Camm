@@ -140,6 +140,14 @@
 
 ## [Unreleased]
 
+- Satellite clouds keep Clouds only / Full as quick endpoints and add a continuous
+  cloud-filter slider: 0% is Full, 100% is the existing brightness key, and
+  intermediate values blend the keyed alpha. The slider commits on release to
+  avoid restaging imagery for every drag event. Filter percentages round-trip in
+  share links; legacy mode codes retain their old endpoint meanings. Background
+  panel refreshes preserve the pending drag value until release. Contributed by
+  [NotProniss](https://github.com/NotProniss) (#1084).
+
 - Flights and Military Flights highlight emergency transponder broadcasts in
   fleet billboards, 3D models and Cockpit contacts. Colors update when a status
   starts or clears. Emergency squawks outrank ADS-B priority statuses; GEV
