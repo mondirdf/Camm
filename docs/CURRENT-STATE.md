@@ -259,7 +259,9 @@ preserved in Full image mode; both modes use the chosen layer opacity. This
 is a display filter, not a cloud mask. The cloud-filter slider is a continuous
 0–100% strength: 0% is Full, 100% is the existing Clouds only key, and
 intermediate values blend their alpha. The value commits on slider release to
-avoid restaging for every pointer event. Satellite share links carry the filter
+avoid restaging for every pointer event. Status refreshes retain the uncommitted
+drag preview; changed model values or disabled controls supersede it.
+Satellite share links carry the filter
 strength; legacy `f`/`a` values keep their Clouds only / Full meanings. Soft and
 Vivid remain layer-opacity presets (40%/70%); history remains transient and links
 open latest.

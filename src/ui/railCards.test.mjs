@@ -183,11 +183,26 @@ test('setting ranges stay below presets and commit expensive filters on release'
       .textContent,
     '53%',
   );
+  view.update([model(100)]);
+  assert.equal(slider.value, '53', 'a status refresh retains the pending drag');
+  assert.equal(
+    slider.getAttribute('aria-valuetext'),
+    '53%',
+    'the accessible preview also survives a refresh',
+  );
   slider.dispatchEvent(new Event('change'));
   assert.deepEqual(calls.at(-1), ['a', { infrared: 53 }]);
   view.update([model(53)]);
   assert.equal(slider.value, '53');
   assert.equal(f.document.activeElement, slider);
+  slider.value = '41';
+  slider.dispatchEvent(new Event('input'));
+  view.update([model(70)]);
+  assert.equal(
+    slider.value,
+    '70',
+    'an authoritative value supersedes the draft',
+  );
   view.destroy();
   slider.value = '41';
   slider.dispatchEvent(new Event('change'));

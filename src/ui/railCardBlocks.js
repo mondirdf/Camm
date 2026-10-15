@@ -110,6 +110,7 @@ export function createRailCardBlocks({ container, cardId, onParams }) {
               const value = Number(block.rangeInput.value);
               const params = rangeParams();
               if (!params) return;
+              if (range.commitOnChange) block.rangeDraft = { range, value };
               set(
                 block.rangeValue,
                 'textContent',
@@ -125,6 +126,7 @@ export function createRailCardBlocks({ container, cardId, onParams }) {
             const onChange = () => {
               if (!block.props.range?.commitOnChange) return;
               const params = rangeParams();
+              block.rangeDraft = null;
               if (params) dispatch(params);
             };
             block.rangeInput.addEventListener('input', onInput);
@@ -196,11 +198,22 @@ export function createRailCardBlocks({ container, cardId, onParams }) {
           syncChipGroup(block.chips, props.chips);
           const range = props.range;
           set(block.rangeRow, 'hidden', !range);
+          const draft = block.rangeDraft;
+          if (
+            draft &&
+            (!range ||
+              range.disabled ||
+              !range.commitOnChange ||
+              ['id', 'param', 'min', 'max', 'step', 'value'].some(
+                (key) => range[key] !== draft.range[key],
+              ))
+          )
+            block.rangeDraft = null;
           if (range) {
             const min = Number(range.min);
             const max = Number(range.max);
             const step = Number(range.step);
-            const candidate = Number(range.value);
+            const candidate = Number(block.rangeDraft?.value ?? range.value);
             const value = Math.min(
               max,
               Math.max(min, Number.isFinite(candidate) ? candidate : min),
