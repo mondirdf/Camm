@@ -668,7 +668,9 @@
       "src/ui/localSdrControls.js",
       "src/layers/localAdsb/feedNames.js",
       "src/ui/localSdrPresentation.js",
-      "src/data/cameraArrival.js"
+      "src/data/cameraArrival.js",
+      "src/providerHealth.js",
+      "src/ui/providerHealthPanel.js"
     ],
     "external": ["cesium"]
   },
@@ -2225,7 +2227,9 @@
       "src/tools/functions.js",
       "src/voice/actionSchemas.js",
       "src/view/index.js",
-      "src/app/embed.js"
+      "src/app/embed.js",
+      "src/providerHealth.js",
+      "src/ui/providerHealthPanel.js"
     ],
     "external": [
       "hls.js",
