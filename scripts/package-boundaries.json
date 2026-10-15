@@ -2056,6 +2056,7 @@
       "src/sources/nominatim.js",
       "src/app/layers/transit.js",
       "src/data/transit.js",
+      "src/data/enturVehicles.js",
       "src/data/transitFeeds.js",
       "src/data/transitIcons.js",
       "src/data/transitPresetStyle.js",
@@ -2655,6 +2656,7 @@
       "src/sources/httpBody.js",
       "src/sources/nominatim.js",
       "src/app/layers/transit.js",
+      "src/data/enturVehicles.js",
       "src/data/transitFeeds.js",
       "src/data/transitIcons.js",
       "src/data/transitPresetStyle.js",
@@ -3208,6 +3210,7 @@
       "server/providers/transit.js",
       "server/providers/transitHistory.js",
       "src/data/gtfsRealtime.js",
+      "src/data/enturVehicles.js",
       "src/data/transitFeeds.js",
       "src/data/transitProxy.js",
       "src/sources/httpBody.js",
@@ -3222,6 +3225,7 @@
     "exports": ["./sources/transit"],
     "modules": [
       "src/data/gtfsRealtime.js",
+      "src/data/enturVehicles.js",
       "src/data/transitFeeds.js",
       "src/data/transitProxy.js",
       "src/sources/transitHistory.js"
@@ -3251,6 +3255,7 @@
       "src/data/spriteOrder.js",
       "src/data/terrainHeights.js",
       "src/data/transit.js",
+      "src/data/enturVehicles.js",
       "src/data/transitFeeds.js",
       "src/data/transitIcons.js",
       "src/data/transitPresetStyle.js",
@@ -3295,6 +3300,7 @@
     "modules": [
       "src/data/iconOrientation.js",
       "src/data/inputOwnership.js",
+      "src/data/enturVehicles.js",
       "src/data/transitFeeds.js",
       "src/data/transitIcons.js",
       "src/data/transitPresetStyle.js",
@@ -3338,6 +3344,7 @@
   "transit-service": {
     "exports": ["./sources/transit-service"],
     "modules": [
+      "src/data/enturVehicles.js",
       "src/data/transitFeeds.js",
       "src/data/transitProxy.js",
       "src/data/gtfsRealtime.js",
