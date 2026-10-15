@@ -133,6 +133,11 @@
 
 ## [Unreleased]
 
+- Keep later satellites when a TLE catalog entry is missing an orbital line or
+  pairs lines with mismatched NORAD catalog numbers. The parser skips corrupt sets
+  and resumes at the next complete named set, instead of losing the rest of the
+  group (#906, #936).
+
 - Flights and Military Flights highlight emergency transponder broadcasts in
   fleet billboards, 3D models and Cockpit contacts. Colors update when a status
   starts or clears. Emergency squawks outrank ADS-B priority statuses; GEV
