@@ -1022,5 +1022,7 @@
   "src/sources/gbfsStations.test.mjs",
   "scripts/qa-gbfs-names.mjs",
   "src/ui/flyToDataSource.js",
-  "src/ui/flyToDataSource.test.mjs"
+  "src/ui/flyToDataSource.test.mjs",
+  "scripts/build-argentina-dams.mjs",
+  "src/data/argentinaDams.test.mjs"
 ]
