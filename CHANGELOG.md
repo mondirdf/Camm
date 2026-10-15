@@ -1,5 +1,7 @@
 # Changelog
 
+- Malformed v2 share links now display `Shared layer selection could not be restored` after startup instead of silently falling back to defaults. Thanks to [daikaginza](https://github.com/daikaginza) for reporting #776 and [KnottyDyes](https://github.com/KnottyDyes) for independently identifying the silent layer-state drop.
+
 - Snow flakes sway within a fixed range instead of drifting sideways faster the
   longer the app runs; the Wind setting still scales the sway.
 
