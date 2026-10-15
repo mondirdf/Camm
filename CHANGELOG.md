@@ -26,6 +26,9 @@
 
 - Cancelled catalog queries refuse execution when their signal is already aborted.
 
+- Release superseded Google Street View open waits and suppress metadata
+  requests whose viewer was unmounted while the service loaded.
+
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
 
