@@ -29,6 +29,7 @@ import { createApplicationGnssIntegrity } from './layers/gnss.js';
 import { createApplicationCables } from './layers/submarineCables.js';
 import { createApplicationStreetLevel } from './layers/streetLevel.js';
 import { createInfrastructureLayers } from '../data/infrastructure.js';
+import { createCabaTrafficLayer } from '../layers/trafficEnforcement/index.js';
 import { localGeoJsonServices } from './localGeojsonServices.js';
 import { createBhoteKoshiEventLayer } from '../data/bhoteKoshiEvent.js';
 import { createBhoteKoshiLocatorLayer } from '../data/bhoteKoshiLocator.js';
@@ -165,6 +166,10 @@ export function createApplicationCatalog({
         }),
         createCyclonesLayer({ feed: sources.cyclones }),
         ...createInfrastructureLayers(localGeoJsonServices),
+        createCabaTrafficLayer({
+          source: sources['caba-traffic-enforcement'],
+          services: localGeoJsonServices,
+        }),
         createApplicationCables({ source: sources.cables }),
         createApplicationFirms({
           surface,

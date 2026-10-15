@@ -2237,6 +2237,9 @@
       "src/voice/actionSchemas.js",
       "src/view/index.js",
       "src/app/embed.js",
+      "src/layers/trafficEnforcement/index.js",
+      "src/layers/trafficEnforcement/source.js",
+      "src/layers/trafficEnforcement/records.js",
       "src/data/cameraFraming.js",
       "src/data/geoImportPins.js",
       "src/data/geoImportImages.js"
@@ -2780,6 +2783,9 @@
       "src/layers/installations/namedMarkers.js",
       "src/data/infrastructureOverlayEntry.js",
       "src/sources/infrastructureData.js",
+      "src/layers/trafficEnforcement/index.js",
+      "src/layers/trafficEnforcement/source.js",
+      "src/layers/trafficEnforcement/records.js",
       "src/data/cameraFraming.js"
     ],
     "external": [
