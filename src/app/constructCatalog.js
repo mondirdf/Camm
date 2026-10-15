@@ -25,6 +25,7 @@ import { createApplicationAwareness } from './layers/militaryAwareness.js';
 import { createApplicationFirms } from './layers/firms.js';
 import { createApplicationEarthquakes } from './layers/earthquakes.js';
 import { createApplicationFirePerimeters } from './layers/perimeters.js';
+import { createApplicationSaFireIncidents } from './layers/saFire.js';
 import { createApplicationGnssIntegrity } from './layers/gnss.js';
 import { createApplicationCables } from './layers/submarineCables.js';
 import { createApplicationStreetLevel } from './layers/streetLevel.js';
@@ -120,6 +121,9 @@ export function createApplicationCatalog({
         createApplicationEarthquakes({ source: sources.earthquakes }),
         createApplicationFirePerimeters({
           source: sources['fire-perimeters'],
+        }),
+        createApplicationSaFireIncidents({
+          source: sources['sa-fire-incidents'],
         }),
         createApplicationGnssIntegrity({
           source: sources['gnss-integrity'],
