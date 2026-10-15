@@ -227,6 +227,15 @@
   largest cities) and `CCTV_VEGVESEN_VIDEO=0` keeps stills only. Attributed
   under NLOD 2.0.
 
+- Add Catalonia (Servei Català de Trànsit) as a keyless CCTV source pack: ~135
+  cameras from a WFS/GML feed that aggregates SCT's own highway cameras with
+  hotlinked Barcelona and Terrassa municipal cameras, each partner named as a
+  credit beside the shared provider. Ambient-card refresh paced to 3 minutes,
+  matching the empirically observed upstream cadence. `CCTV_CATALONIA_MAX_SOURCES`
+  sets the cap and `CCTV_CATALONIA_ENABLED=0` turns the pack off. The catalog
+  is fetched over https with redirects refused and a 1 MiB body cap, and frame
+  links carrying userinfo are rejected even on an allowlisted host.
+
 - Live HLS cameras play on a page opened over plain HTTP from another machine
   (`HOST=0.0.0.0`). The client lease id came from `crypto.randomUUID`, which
   browsers only expose in secure contexts, so starting a live feed threw
